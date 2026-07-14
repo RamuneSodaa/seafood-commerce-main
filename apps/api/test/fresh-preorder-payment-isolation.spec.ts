@@ -51,7 +51,7 @@ describe('product-publish-guard', () => {
   });
 });
 
-// ---------- 2) 普通建单报价：fresh 拒绝、dry 通过 ----------
+// ---------- 2) 普通建单报价：fresh直购和dry均可进入报价 ----------
 describe('buildOrderQuote (via previewOrderQuote)', () => {
   function repoFor(product: { isPublished: boolean; internalTag?: string | null; supportsPickup?: boolean }) {
     const sku = {
@@ -73,9 +73,10 @@ describe('buildOrderQuote (via previewOrderQuote)', () => {
     const quote = await svc.previewOrderQuote(dto, 'cust1');
     expect(quote).toHaveProperty('totalAmountCents');
   });
-  test('fresh（isPublished=false）→ 拒绝 Product is not published', async () => {
+  test('fresh直购（isPublished=false）→ 允许进入普通订单报价', async () => {
     const svc = new OrderWorkflowService(repoFor({ isPublished: false, internalTag: FRESH_TAG }), new OrderPricingService());
-    await expect(svc.previewOrderQuote(dto, 'cust1')).rejects.toThrow('Product is not published');
+    const quote = await svc.previewOrderQuote(dto, 'cust1');
+    expect(quote.totalAmountCents).toBe(500);
   });
 });
 
@@ -121,17 +122,21 @@ describe('createFreshPreorder', () => {
   });
 });
 
-// ---------- 4) createMiniappPayment：含 fresh 的订单必须拒绝；dry 订单不被误拦 ----------
+// ---------- 4) createMiniappPayment：fresh直购允许支付；旧预订单继续拦截 ----------
 describe('createMiniappPayment fresh isolation', () => {
-  function payRepo(items: Array<{ internalTag: string }>) {
-    const freshCount = items.filter((it) => it.internalTag === 'fresh_seafood_catalog').length;
+  function payRepo(
+    items: Array<{ internalTag: string }>,
+    legacyPreorder = false
+  ) {
     return {
       getOrderDetail: async () => ({
         id: 'o1', orderNo: 'SO-1', customerId: 'wechat:openid-1', status: 'PENDING_PAYMENT', totalAmountCents: 5000,
         items: items.map((it) => ({ sku: { product: { internalTag: it.internalTag } } })), statusLogs: []
       }),
-      // 模拟 isFreshPreorderOrder(tx, orderId) 的真实内容判定（tx.orderItem.count 过滤 fresh 标签）。
-      tx: async (cb: any) => cb({ orderItem: { count: async () => freshCount } })
+      tx: async (cb: any) => cb({
+        freshPreorderDetail: { count: async () => legacyPreorder ? 1 : 0 },
+        orderNote: { count: async () => 0 }
+      })
     } as any;
   }
   const actor = { role: UserRole.CUSTOMER, userId: 'wechat:openid-1' } as any;
@@ -144,10 +149,17 @@ describe('createMiniappPayment fresh isolation', () => {
     expect(r).toHaveProperty('launchParams');
   });
 
-  // 要求：含 fresh 的订单不得发起微信支付。Phase 2.48K-fix 后 createMiniappPayment 用真实内容判定拦截 → 通过。
-  test('含 fresh 的订单 → 必须拒绝，且不调用微信支付（2.48K 修复后转绿）', async () => {
-    const pay: any = { createMiniappPayment: jest.fn().mockResolvedValue({ launchParams: { package: 'prepay_id=x' } }) };
+  test('fresh直购订单 → 可以正常发起支付', async () => {
+    const pay: any = { createMiniappPayment: jest.fn().mockResolvedValue({ launchParams: { package: 'prepay_id=fresh-direct' } }) };
     const svc = new OrderWorkflowService(payRepo([{ internalTag: FRESH_TAG }]), new OrderPricingService(), undefined, undefined, undefined, undefined, pay);
+    const result = await svc.createMiniappPayment('o1', actor);
+    expect(pay.createMiniappPayment).toHaveBeenCalled();
+    expect(result).toHaveProperty('launchParams');
+  });
+
+  test('旧鲜鱼预订单 → 必须拒绝在线支付', async () => {
+    const pay: any = { createMiniappPayment: jest.fn().mockResolvedValue({ launchParams: { package: 'prepay_id=legacy' } }) };
+    const svc = new OrderWorkflowService(payRepo([{ internalTag: FRESH_TAG }], true), new OrderPricingService(), undefined, undefined, undefined, undefined, pay);
     await expect(svc.createMiniappPayment('o1', actor)).rejects.toThrow('不支持在线支付');
     expect(pay.createMiniappPayment).not.toHaveBeenCalled();
   });

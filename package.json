@@ -31,5 +31,8 @@
   },
   "prisma": {
     "seed": "npm run seed -w @seafood/api"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14"
   }
 }

@@ -21,6 +21,9 @@ describe('ProductsService update minimal edit guardrails', () => {
       },
       sku: {
         update: jest.fn().mockResolvedValue({})
+      },
+      adminAuditLog: {
+        create: jest.fn().mockResolvedValue({})
       }
     };
 

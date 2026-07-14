@@ -31,6 +31,13 @@ function buildSignedWechatCallbackVerificationFixture(rawBody: string) {
 
 const TEST_WECHAT_PAY_API_V3_KEY = '12345678901234567890123456789012';
 
+function buildNonLegacyPaymentTx() {
+  return {
+    freshPreorderDetail: { count: async () => 0 },
+    orderNote: { count: async () => 0 }
+  };
+}
+
 function buildEncryptedWechatResourceCallbackBody(payload: Record<string, unknown>, apiV3Key = TEST_WECHAT_PAY_API_V3_KEY) {
   const associatedData = 'transaction';
   const nonce = 'replay-nonce-1';
@@ -104,10 +111,10 @@ describe('OrderWorkflowService persistence smoke', () => {
 
   test('previewOrderQuote returns coupon-aware quote without creating order side effects', async () => {
     const repo: any = {
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       findStore: async () => ({ id: 's1', isActive: true }),
       findSkus: async () => [
-        { id: 'sku1', priceCents: 1200, memberPrices: [], product: { isPublished: true, supportsPickup: true, supportsShipping: true } }
+        { id: 'sku1', isActive: true, priceCents: 1200, memberPrices: [], product: { isPublished: true, supportsPickup: true, supportsShipping: true } }
       ],
       findAvailability: async () => [{ skuId: 'sku1' }],
       createOrder: jest.fn(),
@@ -132,10 +139,10 @@ describe('OrderWorkflowService persistence smoke', () => {
 
   test('createOrder supports STORE_PICKUP minimal contract', async () => {
     const repo: any = {
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       findStore: async () => ({ id: 's1', isActive: true }),
       findSkus: async () => [
-        { id: 'sku1', priceCents: 1200, memberPrices: [], product: { isPublished: true, supportsPickup: true, supportsShipping: true } }
+        { id: 'sku1', isActive: true, priceCents: 1200, memberPrices: [], product: { isPublished: true, supportsPickup: true, supportsShipping: true } }
       ],
       findAvailability: async () => [{ skuId: 'sku1' }],
       createOrder: async (_tx: any, data: any) => ({
@@ -171,10 +178,10 @@ describe('OrderWorkflowService persistence smoke', () => {
     let capturedItems: Array<{ quantity: number; unitPriceCents: number }> = [];
 
     const repo: any = {
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       findStore: async () => ({ id: 's1', isActive: true }),
       findSkus: async () => [
-        { id: 'sku1', priceCents: 1200, memberPrices: [], product: { isPublished: true, supportsPickup: true, supportsShipping: true } }
+        { id: 'sku1', isActive: true, priceCents: 1200, memberPrices: [], product: { isPublished: true, supportsPickup: true, supportsShipping: true } }
       ],
       findAvailability: async () => [{ skuId: 'sku1' }],
       createOrder: async (_tx: any, data: any) => {
@@ -221,10 +228,10 @@ describe('OrderWorkflowService persistence smoke', () => {
 
   test('createOrder rejects invalid coupon before order side effects', async () => {
     const repo: any = {
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       findStore: async () => ({ id: 's1', isActive: true }),
       findSkus: async () => [
-        { id: 'sku1', priceCents: 1200, memberPrices: [], product: { isPublished: true, supportsPickup: true, supportsShipping: true } }
+        { id: 'sku1', isActive: true, priceCents: 1200, memberPrices: [], product: { isPublished: true, supportsPickup: true, supportsShipping: true } }
       ],
       findAvailability: async () => [{ skuId: 'sku1' }],
       createOrder: jest.fn(),
@@ -256,10 +263,10 @@ describe('OrderWorkflowService persistence smoke', () => {
 
   test('createOrder requires shipping address for SHIPPING', async () => {
     const repo: any = {
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       findStore: async () => ({ id: 's1', isActive: true }),
       findSkus: async () => [
-        { id: 'sku1', priceCents: 1200, memberPrices: [], product: { isPublished: true, supportsPickup: true, supportsShipping: true } }
+        { id: 'sku1', isActive: true, priceCents: 1200, memberPrices: [], product: { isPublished: true, supportsPickup: true, supportsShipping: true } }
       ],
       findAvailability: async () => [{ skuId: 'sku1' }]
     };
@@ -286,7 +293,7 @@ describe('OrderWorkflowService persistence smoke', () => {
     };
 
     const repo: any = {
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       findPaymentByRef: async (_: any, paymentRef: string) => payments.get(paymentRef) ?? null,
       lockOrder: async () => ({}),
       getOrder: async () => order,
@@ -312,7 +319,7 @@ describe('OrderWorkflowService persistence smoke', () => {
 
   test('markPaid rejects amount mismatch before payment mutation', async () => {
     const repo: any = {
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       findPaymentByRef: async () => null,
       lockOrder: async () => ({}),
       getOrder: async () => ({
@@ -348,7 +355,7 @@ describe('OrderWorkflowService persistence smoke', () => {
 
   test('markPaid rejects zero amount payment completion before mutation', async () => {
     const repo: any = {
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       findPaymentByRef: async () => null,
       lockOrder: async () => ({}),
       getOrder: async () => ({
@@ -399,7 +406,7 @@ describe('OrderWorkflowService persistence smoke', () => {
 
   test('markPaid rejects CUSTOMER access to another customer order before mutating state', async () => {
     const repo: any = {
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       lockOrder: async () => ({}),
       getOrder: async () => ({
         id: 'o1',
@@ -431,7 +438,7 @@ describe('OrderWorkflowService persistence smoke', () => {
         totalAmountCents: 12800
       }),
       // Phase 2.48K-fix：createMiniappPayment 现用 repo.tx + isFreshPreorderOrder 真实内容判定；dry 订单 fresh 计数=0。
-      tx: async (cb: any) => cb({ orderItem: { count: async () => 0 } })
+      tx: async (cb: any) => cb(buildNonLegacyPaymentTx())
     };
     const paymentCreateClient: any = {
       createMiniappPayment: jest.fn().mockResolvedValue({
@@ -479,7 +486,7 @@ describe('OrderWorkflowService persistence smoke', () => {
         totalAmountCents: 12800
       }),
       // Phase 2.48K-fix：createMiniappPayment 现用 repo.tx + isFreshPreorderOrder 真实内容判定；dry 订单 fresh 计数=0。
-      tx: async (cb: any) => cb({ orderItem: { count: async () => 0 } })
+      tx: async (cb: any) => cb(buildNonLegacyPaymentTx())
     };
 
     const service = new OrderWorkflowService(repo, new OrderPricingService());
@@ -510,7 +517,7 @@ describe('OrderWorkflowService persistence smoke', () => {
   test('handleMiniappPaymentCallback verifies wechat callback and completes payment through markPaid', async () => {
     const repo: any = {
       findOrderByOrderNo: async () => ({ id: 'o-callback-1', orderNo: 'SO-20260408-1' }),
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       lockOrder: async () => ({}),
       getOrder: async () => ({
         id: 'o-callback-1',
@@ -554,13 +561,13 @@ describe('OrderWorkflowService persistence smoke', () => {
       paidAmountCents: 12800,
       message: 'Verified callback payment applied'
     });
-    expect(repo.createPaymentRecord).toHaveBeenCalledWith({}, 'o-callback-1', 'wx-tx-1001', 12800);
+    expect(repo.createPaymentRecord).toHaveBeenCalledWith(expect.any(Object), 'o-callback-1', 'wx-tx-1001', 12800);
   });
 
   test('handleMiniappPaymentCallback returns callback-safe duplicate acknowledgment for same-order duplicate paymentRef', async () => {
     const repo: any = {
       findOrderByOrderNo: async () => ({ id: 'o-callback-2', orderNo: 'SO-20260408-2' }),
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       lockOrder: async () => ({}),
       getOrder: async () => ({
         id: 'o-callback-2',
@@ -624,7 +631,7 @@ describe('OrderWorkflowService persistence smoke', () => {
   test('handleMiniappPaymentCallback fails honestly for cross-order duplicate paymentRef conflict', async () => {
     const repo: any = {
       findOrderByOrderNo: async () => ({ id: 'o-callback-3', orderNo: 'SO-20260408-3' }),
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       lockOrder: async () => ({}),
       getOrder: async () => ({
         id: 'o-callback-3',
@@ -656,7 +663,7 @@ describe('OrderWorkflowService persistence smoke', () => {
   test('handleMiniappPaymentCallback fails honestly for invalid payment completion transition after verification', async () => {
     const repo: any = {
       findOrderByOrderNo: async () => ({ id: 'o-callback-4', orderNo: 'SO-20260408-4' }),
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       lockOrder: async () => ({}),
       getOrder: async () => ({
         id: 'o-callback-4',
@@ -692,7 +699,7 @@ describe('OrderWorkflowService persistence smoke', () => {
 
     const repo: any = {
       findOrderByOrderNo: async () => ({ id: 'o-callback-v3-1', orderNo: 'SO-V3-1' }),
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       lockOrder: async () => ({}),
       getOrder: async () => ({
         id: 'o-callback-v3-1',
@@ -735,7 +742,7 @@ describe('OrderWorkflowService persistence smoke', () => {
     expect(result.status).toBe('APPLIED');
     expect(result.paymentRef).toBe('wx-native-transaction-1001');
     expect(result.paidAmountCents).toBe(5900);
-    expect(repo.createPaymentRecord).toHaveBeenCalledWith({}, 'o-callback-v3-1', 'wx-native-transaction-1001', 5900);
+    expect(repo.createPaymentRecord).toHaveBeenCalledWith(expect.any(Object), 'o-callback-v3-1', 'wx-native-transaction-1001', 5900);
   });
 
   test('handleMiniappPaymentCallback rejects native Wechat v3 non-SUCCESS trade state', async () => {
@@ -781,7 +788,7 @@ describe('OrderWorkflowService persistence smoke', () => {
     process.env.WECHAT_PAY_API_V3_KEY = TEST_WECHAT_PAY_API_V3_KEY;
     const repo: any = {
       findOrderByOrderNo: async () => ({ id: 'o-callback-v3-mismatch', orderNo: 'SO-V3-MISMATCH' }),
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       lockOrder: async () => ({}),
       getOrder: async () => ({
         id: 'o-callback-v3-mismatch',
@@ -1026,7 +1033,7 @@ describe('OrderWorkflowService persistence smoke', () => {
 
   test('cancelOrder rejects CUSTOMER access to another customer order before mutating state', async () => {
     const repo: any = {
-      tx: (fn: any) => fn({}),
+      tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
       lockOrder: async () => ({}),
       getOrder: async () => ({
         id: 'o1',
