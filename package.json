@@ -1,0 +1,35 @@
+{
+  "name": "seafood-commerce",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:admin-local": "bash scripts/start-admin-local.sh",
+    "stop:admin-local": "bash scripts/stop-admin-local.sh",
+    "check:admin-local": "bash scripts/check-admin-local.sh",
+    "repair:admin-local": "bash scripts/repair-admin-local.sh",
+    "dev:admin-local:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-admin-local.ps1",
+    "stop:admin-local:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-admin-local.ps1",
+    "check:admin-local:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-admin-local.ps1",
+    "repair:admin-local:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/repair-admin-local.ps1",
+    "test": "npm run test -w @seafood/api",
+    "seed": "npm run seed -w @seafood/api",
+    "seed:local": "npm run seed:local -w @seafood/api",
+    "seed:prod:stores:dry-run": "npm run seed:prod:stores:dry-run -w @seafood/api",
+    "seed:prod:stores:apply": "npm run seed:prod:stores:apply -w @seafood/api",
+    "seed:prod:products:dry-run": "npm run seed:prod:products:dry-run -w @seafood/api",
+    "seed:prod:products:apply": "npm run seed:prod:products:apply -w @seafood/api",
+    "seed:prod:inventory:dry-run": "npm run seed:prod:inventory:dry-run -w @seafood/api",
+    "seed:prod:inventory:apply": "npm run seed:prod:inventory:apply -w @seafood/api",
+    "seed:prod:marketing:dry-run": "npm run seed:prod:marketing:dry-run -w @seafood/api",
+    "seed:prod:marketing:apply": "npm run seed:prod:marketing:apply -w @seafood/api",
+    "seed:prod:admin-bootstrap:dry-run": "npm run seed:prod:admin-bootstrap:dry-run -w @seafood/api",
+    "seed:prod:admin-bootstrap:apply": "npm run seed:prod:admin-bootstrap:apply -w @seafood/api"
+  },
+  "prisma": {
+    "seed": "npm run seed -w @seafood/api"
+  }
+}

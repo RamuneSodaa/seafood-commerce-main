@@ -1,0 +1,7 @@
+# Example only.
+# The real file is .local/env/admin.local and is ignored by Git.
+
+export ADMIN_DEV_USERNAME='admin'
+export ADMIN_DEV_PASSWORD='CHANGE_ME_RANDOM_PASSWORD'
+export ADMIN_DEV_DISPLAY_NAME='本地管理员'
+export ADMIN_AUTH_SECRET='CHANGE_ME_RANDOM_64_CHARACTER_SECRET'

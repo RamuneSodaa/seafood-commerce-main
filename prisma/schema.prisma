@@ -1,0 +1,644 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum FulfillmentType {
+  STORE_PICKUP
+  SHIPPING
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID_PENDING_PREP
+  READY_FOR_PICKUP
+  COMPLETED
+  PAID_PENDING_SHIPMENT
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  AFTER_SALES
+}
+
+enum AdminRole {
+  ADMIN
+  STORE_STAFF
+}
+
+enum CouponDiscountType {
+  AMOUNT_OFF
+  PERCENT_OFF
+}
+
+enum CouponTemplateStatus {
+  DRAFT
+  ACTIVE
+  DISABLED
+}
+
+enum CouponScene {
+  GENERAL
+  NEW_USER
+  REFERRAL_INVITER
+  REFERRAL_INVITEE
+  MANUAL
+}
+
+enum UserCouponStatus {
+  CLAIMED
+  LOCKED
+  USED
+  EXPIRED
+  VOID
+}
+
+enum CouponGrantReason {
+  NEW_USER
+  REFERRAL_REWARD
+  MANUAL
+  SEED
+}
+
+enum CouponRedemptionAction {
+  LOCK
+  USE
+  RELEASE
+  VOID
+}
+
+enum MemberLevel {
+  DEFAULT
+}
+
+enum ReferralRelationStatus {
+  BOUND
+  QUALIFIED
+  REWARDED
+  VOID
+}
+
+enum ReferralRewardType {
+  COUPON
+}
+
+enum ReferralRewardStatus {
+  PENDING
+  GRANTED
+  VOID
+}
+
+enum ReferralEventType {
+  OPEN
+  LOGIN_BIND
+  FIRST_ORDER_PAID
+  REWARD_GRANTED
+}
+
+model Store {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  address      String
+  contactName  String?
+  contactPhone String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  inventories    Inventory[]
+  availabilities StoreSkuAvailability[]
+  orders         Order[]
+  adminUsers     AdminUser[]
+}
+
+model Product {
+  id               String   @id @default(cuid())
+  name             String
+  description      String?
+  coverImageUrl    String?
+  category         String?
+  sortOrder        Int      @default(0)
+  isRecommended    Boolean  @default(false)
+  isPublished      Boolean  @default(false)
+  supportsPickup   Boolean  @default(true)
+  supportsShipping Boolean  @default(true)
+  internalTag      String?
+  internalNote     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  skus Sku[]
+}
+
+model Sku {
+  id         String   @id @default(cuid())
+  productId  String
+  code       String   @unique
+  name       String
+  priceCents Int
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  product        Product                @relation(fields: [productId], references: [id])
+  inventories    Inventory[]
+  availabilities StoreSkuAvailability[]
+  orderItems     OrderItem[]
+  cartItems      CartItem[]
+  memberPrices   SkuMemberPrice[]
+}
+
+model Cart {
+  id         String   @id @default(cuid())
+  customerId String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  items CartItem[]
+
+  @@index([customerId])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  skuId     String
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  sku  Sku  @relation(fields: [skuId], references: [id])
+
+  @@unique([cartId, skuId])
+  @@index([skuId])
+}
+
+model StoreSkuAvailability {
+  id        String   @id @default(cuid())
+  storeId   String
+  skuId     String
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id])
+  sku   Sku   @relation(fields: [skuId], references: [id])
+
+  @@unique([storeId, skuId])
+}
+
+model Inventory {
+  id             String   @id @default(cuid())
+  storeId        String
+  skuId          String
+  physicalStock  Int
+  availableStock Int
+  reservedStock  Int
+  damagedStock   Int      @default(0)
+  safeStock      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  store         Store          @relation(fields: [storeId], references: [id])
+  sku           Sku            @relation(fields: [skuId], references: [id])
+  inventoryLogs InventoryLog[]
+
+  @@unique([storeId, skuId])
+}
+
+model Order {
+  id                        String          @id @default(cuid())
+  orderNo                   String          @unique
+  customerId                String
+  storeId                   String
+  fulfillmentType           FulfillmentType
+  status                    OrderStatus
+  subtotalAmountCents       Int?
+  discountAmountCents       Int             @default(0)
+  memberDiscountAmountCents Int             @default(0)
+  couponDiscountAmountCents Int             @default(0)
+  totalAmountCents          Int
+  appliedCouponCode         String?
+  appliedUserCouponId       String?
+  pickupDate                DateTime?
+  pickupTimeSlot            String?
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
+
+  store              Store                         @relation(fields: [storeId], references: [id])
+  items              OrderItem[]
+  couponApplications OrderCouponApplication[]
+  statusLogs         OrderStatusLog[]
+  paymentRecords     PaymentRecord[]
+  shipment           Shipment?
+  shippingAddress    OrderShippingAddressSnapshot?
+  pickupRecord       PickupRecord?
+  notes              OrderNote[]
+  // Phase 2.49G：鲜鱼预订正式明细 1:1（虚拟反向关系，Order 表无新增物理列）
+  freshPreorderDetail FreshPreorderDetail?
+}
+
+// Phase 2.40B：订单内部备注 / 处理记录。默认仅后台可见(internal)，顾客端永不 include。
+model OrderNote {
+  id            String   @id @default(cuid())
+  orderId       String
+  authorAdminId String?
+  type          String   @default("internal")
+  visibility    String   @default("internal")
+  body          String
+  createdAt     DateTime @default(now())
+  // Phase 2.40C：软删除/撤回（不硬删，保留审计）。deletedByAdminId 仅存 id，不建第二条 AdminUser relation，避免关系冲突。
+  deletedAt        DateTime?
+  deletedByAdminId String?
+  deleteReason     String?
+
+  order  Order      @relation(fields: [orderId], references: [id])
+  author AdminUser? @relation(fields: [authorAdminId], references: [id])
+
+  @@index([orderId])
+  @@index([authorAdminId])
+}
+
+model CouponTemplate {
+  id                     String               @id @default(cuid())
+  code                   String               @unique
+  name                   String
+  description            String?
+  discountType           CouponDiscountType   @default(AMOUNT_OFF)
+  thresholdAmountCents   Int                  @default(0)
+  discountAmountCents    Int?
+  discountPercent        Int?
+  maxDiscountAmountCents Int?
+  totalLimit             Int?
+  perUserLimit           Int                  @default(1)
+  stackGroup             String               @default("GENERAL")
+  canStack               Boolean              @default(false)
+  priority               Int                  @default(0)
+  autoGrantOnNewUser     Boolean              @default(false)
+  validFrom              DateTime?
+  validTo                DateTime?
+  status                 CouponTemplateStatus @default(DRAFT)
+  scene                  CouponScene          @default(GENERAL)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  userCoupons       UserCoupon[]
+  grantLogs         CouponGrantLog[]
+  orderApplications OrderCouponApplication[]
+
+  @@index([status, scene])
+  @@index([autoGrantOnNewUser, status])
+}
+
+model UserCoupon {
+  id            String           @id @default(cuid())
+  customerId    String
+  templateId    String
+  status        UserCouponStatus @default(CLAIMED)
+  lockedOrderId String?
+  usedOrderId   String?
+  claimedAt     DateTime         @default(now())
+  lockedAt      DateTime?
+  usedAt        DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  template          CouponTemplate           @relation(fields: [templateId], references: [id])
+  grantLogs         CouponGrantLog[]
+  redemptionLogs    CouponRedemptionLog[]
+  orderApplications OrderCouponApplication[]
+
+  @@index([customerId, status])
+  @@index([templateId, status])
+  @@index([lockedOrderId])
+  @@index([usedOrderId])
+}
+
+model OrderCouponApplication {
+  id                 String   @id @default(cuid())
+  orderId            String
+  userCouponId       String
+  couponTemplateId   String
+  couponCodeSnapshot String
+  couponNameSnapshot String
+  amountCents        Int
+  createdAt          DateTime @default(now())
+
+  order          Order          @relation(fields: [orderId], references: [id])
+  userCoupon     UserCoupon     @relation(fields: [userCouponId], references: [id])
+  couponTemplate CouponTemplate @relation(fields: [couponTemplateId], references: [id])
+
+  @@unique([orderId, userCouponId])
+  @@index([userCouponId])
+  @@index([couponTemplateId])
+}
+
+model CouponGrantLog {
+  id                 String            @id @default(cuid())
+  customerId         String
+  templateId         String
+  userCouponId       String?
+  reason             CouponGrantReason
+  referrerCustomerId String?
+  referredCustomerId String?
+  orderId            String?
+  createdAt          DateTime          @default(now())
+
+  template   CouponTemplate @relation(fields: [templateId], references: [id])
+  userCoupon UserCoupon?    @relation(fields: [userCouponId], references: [id])
+
+  @@index([customerId, reason])
+  @@index([referrerCustomerId])
+  @@index([referredCustomerId])
+}
+
+model CouponRedemptionLog {
+  id           String                 @id @default(cuid())
+  userCouponId String
+  orderId      String?
+  action       CouponRedemptionAction
+  amountCents  Int                    @default(0)
+  createdAt    DateTime               @default(now())
+
+  userCoupon UserCoupon @relation(fields: [userCouponId], references: [id])
+
+  @@index([userCouponId, action])
+  @@index([orderId])
+}
+
+model MemberProfile {
+  id          String      @id @default(cuid())
+  customerId  String      @unique
+  inviteCode  String      @unique
+  isMember    Boolean     @default(true)
+  memberLevel MemberLevel @default(DEFAULT)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([inviteCode])
+}
+
+model SkuMemberPrice {
+  id          String      @id @default(cuid())
+  skuId       String
+  memberLevel MemberLevel @default(DEFAULT)
+  priceCents  Int
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  sku Sku @relation(fields: [skuId], references: [id])
+
+  @@unique([skuId, memberLevel])
+  @@index([isActive])
+}
+
+model ReferralRelation {
+  id                 String                 @id @default(cuid())
+  referrerCustomerId String
+  referredCustomerId String                 @unique
+  inviteCode         String
+  status             ReferralRelationStatus @default(BOUND)
+  boundAt            DateTime               @default(now())
+  qualifiedOrderId   String?
+  qualifiedAt        DateTime?
+  rewardedAt         DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  rewards ReferralReward[]
+
+  @@index([referrerCustomerId])
+  @@index([inviteCode])
+  @@index([status])
+}
+
+model ReferralReward {
+  id                 String               @id @default(cuid())
+  relationId         String
+  receiverCustomerId String
+  rewardType         ReferralRewardType   @default(COUPON)
+  userCouponId       String?
+  status             ReferralRewardStatus @default(PENDING)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  relation ReferralRelation @relation(fields: [relationId], references: [id])
+
+  @@index([receiverCustomerId, status])
+}
+
+model ReferralEvent {
+  id         String            @id @default(cuid())
+  inviteCode String?
+  eventType  ReferralEventType
+  customerId String?
+  orderId    String?
+  createdAt  DateTime          @default(now())
+
+  @@index([customerId, eventType])
+  @@index([inviteCode])
+}
+
+model CustomerAddress {
+  id           String   @id @default(cuid())
+  customerId   String
+  receiverName String
+  phone        String
+  province     String
+  city         String
+  district     String
+  detail       String
+  postalCode   String?
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([customerId, isDefault])
+  @@index([customerId, updatedAt])
+}
+
+model OrderItem {
+  id             String @id @default(cuid())
+  orderId        String
+  skuId          String
+  quantity       Int
+  unitPriceCents Int
+
+  order Order @relation(fields: [orderId], references: [id])
+  sku   Sku   @relation(fields: [skuId], references: [id])
+}
+
+model OrderShippingAddressSnapshot {
+  id           String  @id @default(cuid())
+  orderId      String  @unique
+  receiverName String
+  phone        String
+  province     String
+  city         String
+  district     String
+  detail       String
+  postalCode   String?
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+model Shipment {
+  id             String    @id @default(cuid())
+  orderId        String    @unique
+  courierCompany String
+  trackingNumber String
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+model PickupRecord {
+  id         String    @id @default(cuid())
+  orderId    String    @unique
+  pickupCode String
+  pickedUpAt DateTime?
+  verifiedBy String?
+  createdAt  DateTime  @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+model PaymentRecord {
+  id              String   @id @default(cuid())
+  orderId         String
+  paymentRef      String   @unique
+  paidAmountCents Int
+  paidAt          DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+// Phase 2.42A：后台关键操作审计日志（商品/SKU 等）。metadataJson 存 JSON 字符串（非 Json 类型，避免方言差异）。
+// 仅记录非敏感操作摘要：禁止写入密码/token/secret/顾客 PII（手机号/地址/自提码）。
+model AdminAuditLog {
+  id           String   @id @default(cuid())
+  adminId      String?
+  action       String
+  entityType   String
+  entityId     String
+  entityLabel  String?
+  summary      String?
+  metadataJson String?
+  createdAt    DateTime @default(now())
+
+  admin AdminUser? @relation(fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model InventoryLog {
+  id                String   @id @default(cuid())
+  inventoryId       String
+  orderId           String?
+  storeId           String?
+  skuId             String?
+  action            String
+  deltaAvailable    Int
+  deltaReserved     Int
+  deltaPhysical     Int
+  oldAvailableStock Int?
+  newAvailableStock Int?
+  oldReservedStock  Int?
+  newReservedStock  Int?
+  oldPhysicalStock  Int?
+  newPhysicalStock  Int?
+  reason            String?
+  note              String?
+  operatorAdminId   String?
+  createdAt         DateTime @default(now())
+
+  inventory     Inventory  @relation(fields: [inventoryId], references: [id])
+  operatorAdmin AdminUser? @relation(fields: [operatorAdminId], references: [id])
+
+  @@index([operatorAdminId])
+  @@index([storeId, skuId])
+}
+
+model OrderStatusLog {
+  id              String       @id @default(cuid())
+  orderId         String
+  fromStatus      OrderStatus?
+  toStatus        OrderStatus
+  action          String?
+  reason          String?
+  operatorAdminId String?
+  createdAt       DateTime     @default(now())
+
+  order         Order      @relation(fields: [orderId], references: [id])
+  operatorAdmin AdminUser? @relation(fields: [operatorAdminId], references: [id])
+
+  @@index([operatorAdminId])
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  passwordHash String
+  displayName  String
+  role         AdminRole @default(STORE_STAFF)
+  storeId      String?
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  store           Store?           @relation(fields: [storeId], references: [id])
+  inventoryLogs   InventoryLog[]
+  orderStatusLogs OrderStatusLog[]
+  orderNotes      OrderNote[]
+  auditLogs       AdminAuditLog[]
+
+  @@index([role, isActive])
+  @@index([storeId])
+}
+
+
+// ===== Phase 2.49G：鲜鱼预订正式明细（方案 B；不改 OrderStatus，加性）=====
+enum FreshPreorderStage {
+  PENDING_STORE_CONFIRMATION
+  CONFIRMED_WAITING_PICKUP
+  COMPLETED_OFFLINE_SETTLED
+  CANCELLED
+}
+
+model FreshPreorderDetail {
+  id                     String             @id @default(cuid())
+  orderId                String             @unique
+  stage                  FreshPreorderStage @default(PENDING_STORE_CONFIRMATION)
+  estimatedTotalCents    Int?
+  actualWeightJin        Decimal?           @db.Decimal(10, 2)
+  actualUnitPriceCents   Int?
+  finalTotalCents        Int?
+  storeConfirmNote       String?
+  customerContactNote    String?
+  cancelReason           String?
+  confirmedByAdminUserId String?
+  confirmedAt            DateTime?
+  completedAt            DateTime?
+  cancelledAt            DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([stage])
+  @@index([orderId])
+}

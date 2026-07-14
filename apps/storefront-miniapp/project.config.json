@@ -1,0 +1,14 @@
+{
+  "appid": "wx0ad267108804ad22",
+  "projectname": "seafood-storefront-miniapp",
+  "description": "海鲜商城微信小程序最小壳层",
+  "miniprogramRoot": "dist/",
+  "compileType": "miniprogram",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "postcss": true,
+    "minified": false,
+    "enhance": true
+  }
+}

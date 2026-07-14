@@ -1,0 +1,42 @@
+{
+  "name": "@seafood/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest --runInBand",
+    "seed": "npm run seed:local",
+    "seed:local": "node -r ts-node/register prisma/seed.local.ts",
+    "seed:prod:stores:dry-run": "node -r ts-node/register prisma/seed.production.stores.ts --dry-run",
+    "seed:prod:stores:apply": "node -r ts-node/register prisma/seed.production.stores.ts --apply --confirm-production-seed",
+    "seed:prod:products:dry-run": "node -r ts-node/register prisma/seed.production.products.ts --dry-run",
+    "seed:prod:products:apply": "node -r ts-node/register prisma/seed.production.products.ts --apply --confirm-production-seed",
+    "seed:prod:inventory:dry-run": "node -r ts-node/register prisma/seed.production.inventory.ts --dry-run",
+    "seed:prod:inventory:apply": "node -r ts-node/register prisma/seed.production.inventory.ts --apply --confirm-production-seed",
+    "seed:prod:marketing:dry-run": "node -r ts-node/register prisma/seed.production.marketing.ts --dry-run",
+    "seed:prod:marketing:apply": "node -r ts-node/register prisma/seed.production.marketing.ts --apply --confirm-production-seed",
+    "seed:prod:admin-bootstrap:dry-run": "node -r ts-node/register prisma/seed.production.admin.bootstrap.ts --dry-run",
+    "seed:prod:admin-bootstrap:apply": "node -r ts-node/register prisma/seed.production.admin.bootstrap.ts --apply --confirm-production-admin-bootstrap",
+    "start": "node -r ts-node/register src/main.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.0",
+    "@nestjs/core": "^11.1.0",
+    "@nestjs/platform-express": "^11.1.18",
+    "@prisma/client": "^6.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.1.18",
+    "@types/express": "^5.0.1",
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "prisma": "^6.0.0",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,285 @@
+node_modules
+coverage
+.env
+.DS_Store
+.local/env/*
+!.local/env/README.md
+!.local/env/wechat-miniapp.local.example
+.local/*.local
+.local/env/wechat-miniapp.local
+wechatpay_platform_public_key.pem
+1744602243_20260516_cert/
+
+# Phase 2.49B-1 敏感资产保护
+.secrets/
+*.pem
+*.p12
+*.key
+*apiclient*
+*.dump
+1744602243_20260516_cert/
+证书使用说明.txt
+
+# ===== SEAFOOD SAFE GIT RULES BEGIN =====
+
+# 本机环境变量和秘密资料
+.env
+.env.*
+!.env.example
+!.env.*.example
+.local/
+.secrets/
+.handoff_backups/
+project.private.config.json
+
+# 微信及支付证书、私钥
+*.pem
+*.p12
+*.pfx
+*.key
+*.crt
+*.cer
+*apiclient*
+*微信支付*操作密码*.txt
+*微信支付*密钥*.txt
+*AppSecret*.txt
+*密码记录*.txt
+1744602243_20260516_cert/
+
+# 数据库与数据库备份
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.bak
+*.bak.*
+*.bak_*
+PG_VERSION
+postmaster.pid
+postmaster.opts
+
+# 依赖和编译产物
+node_modules/
+miniprogram_npm/
+.next/
+.nuxt/
+.taro/
+dist/
+build/
+coverage/
+.cache/
+.turbo/
+.nx/
+.temp/
+.tmp/
+tmp/
+logs/
+*.log
+
+# 本地工具及历史工作目录
+.codex_tmp*
+.codex_backups/
+.codex_review_packs/
+.release_migration_workspaces/
+.playwright-cli/
+save/
+backup/
+backups/
+
+# 审查包
+review_packs/
+
+# 压缩文件和安装文件
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+*.dmg
+*.iso
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# ===== SEAFOOD SAFE GIT RULES END =====
+
+# ===== SEAFOOD PUBLIC GITHUB BEGIN =====
+
+# 真实环境变量和本机秘密
+.env
+.env.*
+!.env.example
+!.env.*.example
+.local/
+.secrets/
+.handoff_backups/
+sendgrid.env
+*.local.env
+project.private.config.json
+
+# 微信及微信支付秘密
+*.pem
+*.p12
+*.pfx
+*.key
+*.crt
+*.cer
+*apiclient*
+*微信支付*操作密码*.txt
+*微信支付*密钥*.txt
+*AppSecret*.txt
+*密码记录*.txt
+1744602243_20260516_cert/
+
+# 数据库和数据库备份
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.bak
+*.bak.*
+*.bak_*
+PG_VERSION
+postmaster.pid
+postmaster.opts
+
+# 依赖、缓存和编译产物
+node_modules/
+miniprogram_npm/
+.next/
+.nuxt/
+.taro/
+dist/
+build/
+coverage/
+.cache/
+.turbo/
+.nx/
+.temp/
+.tmp/
+tmp/
+logs/
+*.log
+
+# 本地开发及历史工作目录
+.codex_tmp*
+.codex_backups/
+.codex_review_packs/
+.release_migration_workspaces/
+.playwright-cli/
+save/
+backup/
+backups/
+review_packs/
+
+# 顶层原始商品图片和设计素材
+# 只是不上传 GitHub，Mac 本地文件不会删除
+/图片/
+/新放图片/
+/鱼店图片/
+/seafood_miniapp_ui_module_assets_v2/
+
+# 非源码办公资料
+*.doc
+*.docx
+*.pages
+*.numbers
+*.keynote
+
+# 压缩文件及安装文件
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+*.dmg
+*.iso
+
+# macOS 和 Windows 系统文件
+.DS_Store
+Thumbs.db
+
+# ===== SEAFOOD PUBLIC GITHUB END =====
+
+# ===== SEAFOOD PUBLIC SAFE BEGIN =====
+
+# Local secrets and environments
+.env
+.env.*
+!.env.example
+!.env.*.example
+.local/
+.secrets/
+sendgrid.env
+project.private.config.json
+
+# Certificates and private keys
+*.pem
+*.p12
+*.pfx
+*.key
+*.crt
+*.cer
+*apiclient*
+1744602243_20260516_cert/
+
+# Databases and backups
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.bak
+
+# Dependencies and build output
+node_modules/
+miniprogram_npm/
+.next/
+.taro/
+dist/
+build/
+coverage/
+.cache/
+.turbo/
+.tmp/
+tmp/
+logs/
+*.log
+
+# Local work and review packages
+.codex_tmp*
+.codex_backups/
+.codex_review_packs/
+.release_migration_workspaces/
+review_packs/
+
+# Large source image folders kept only on this Mac
+/图片/
+/新放图片/
+/鱼店图片/
+/seafood_miniapp_ui_module_assets_v2/
+
+# Office and archive files
+*.doc
+*.docx
+*.pages
+*.numbers
+*.keynote
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+*.dmg
+*.iso
+
+.DS_Store
+Thumbs.db
+
+# ===== SEAFOOD PUBLIC SAFE END =====
