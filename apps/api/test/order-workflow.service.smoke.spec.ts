@@ -7,7 +7,7 @@ import { OrderWorkflowService } from '../src/modules/orders/order-workflow.servi
 
 function buildSignedWechatCallbackVerificationFixture(rawBody: string) {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
-  const wechatpayTimestamp = '1712563200';
+  const wechatpayTimestamp = Math.floor(Date.now() / 1000).toString();
   const wechatpayNonce = 'wechatpay-nonce-1';
   const wechatpaySerial = 'wechatpay-platform-serial-1';
   const signer = createSign('RSA-SHA256');
@@ -917,7 +917,7 @@ describe('OrderWorkflowService persistence smoke', () => {
           wechatpaySignature: 'signature'
         }
       )
-    ).toThrow(new InternalServerErrorException('WECHAT_PAY_PLATFORM_PUBLIC_KEY_PEM is not configured'));
+    ).toThrow(new InternalServerErrorException('WECHAT_PAY_PUBLIC_KEY_PEM is not configured'));
   });
 
   test('MiniappPaymentCallbackVerificationService rejects mismatched platform serial before business mapping', () => {

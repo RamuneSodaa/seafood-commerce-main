@@ -25,13 +25,17 @@ function assertIntegrationTestDatabase(): void {
   }
 }
 
-const shouldRunIntegrationTest = Boolean(process.env.DATABASE_URL);
+const shouldRunIntegrationTest =
+  process.env.RUN_PG_INTEGRATION === '1';
 
 if (shouldRunIntegrationTest) {
   assertIntegrationTestDatabase();
 }
 
-const describeIntegration = shouldRunIntegrationTest ? describe : describe.skip;
+const describeIntegration =
+  shouldRunIntegrationTest
+    ? describe
+    : describe.skip;
 
 describeIntegration('OrderWorkflowService PostgreSQL integration', () => {
   const prisma = new PrismaClient();

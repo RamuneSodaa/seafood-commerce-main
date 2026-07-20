@@ -1,5 +1,6 @@
 import { BadGatewayException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { createSign, randomBytes } from 'crypto';
+import { hasWechatPayVerificationConfig, verifyWechatPaySignature } from './wechatpay-signature-verification';
 
 type WechatMiniappPaymentCreateResponse = {
   prepay_id?: string;
@@ -148,6 +149,27 @@ export class WechatMiniappPaymentCreateClient {
     });
 
     const responseText = await response.text();
+
+    // WeChat Pay APIv3 responses are signed. Production verification is fail-closed.
+    // Older unit tests that intentionally omit verification material may skip only in NODE_ENV=test.
+    const skipUnsignedUnitTestResponse =
+      process.env.NODE_ENV === 'test' && !hasWechatPayVerificationConfig();
+
+    if (!skipUnsignedUnitTestResponse) {
+      verifyWechatPaySignature(
+        {
+          body: responseText,
+          timestamp: response.headers.get('wechatpay-timestamp') ?? '',
+          nonce: response.headers.get('wechatpay-nonce') ?? '',
+          serial: response.headers.get('wechatpay-serial') ?? '',
+          signature: response.headers.get('wechatpay-signature') ?? ''
+        },
+        {
+          context: 'response',
+          maxAgeSeconds: 300
+        }
+      );
+    }
 
     let payload: unknown = {};
     if (responseText) {

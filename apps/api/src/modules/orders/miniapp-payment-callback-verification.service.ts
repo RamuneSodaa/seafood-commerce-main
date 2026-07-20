@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
-import { createDecipheriv, createPublicKey, createVerify } from 'crypto';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { createDecipheriv } from 'crypto';
+import { verifyWechatPaySignature } from './wechatpay-signature-verification';
 import { MiniappPaymentCallbackDto } from './dto/order-workflow.dto';
 
 type SupportedMiniappPaymentCallbackProvider = 'wechat';
@@ -47,16 +48,6 @@ type WechatPayEncryptedResource = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
-}
-
-function readRequiredWechatVerificationConfig(name: 'WECHAT_PAY_PLATFORM_PUBLIC_KEY_PEM' | 'WECHAT_PAY_PLATFORM_SERIAL'): string {
-  const value = process.env[name]?.trim();
-
-  if (!value) {
-    throw new InternalServerErrorException(`${name} is not configured`);
-  }
-
-  return value;
 }
 
 function readOptionalWechatVerificationConfig(name: string): string | undefined {
@@ -230,34 +221,25 @@ export class MiniappPaymentCallbackVerificationService {
     callbackPayload: Record<string, unknown>,
     input: WechatCallbackSignatureVerificationInput
   ): VerifiedWechatMiniappPaymentCallback {
-    const platformPublicKeyPem = readRequiredWechatVerificationConfig('WECHAT_PAY_PLATFORM_PUBLIC_KEY_PEM');
-    const configuredPlatformSerial = readRequiredWechatVerificationConfig('WECHAT_PAY_PLATFORM_SERIAL');
     const rawBody = assertNonEmptyString(input.rawBody, 'raw Wechat callback body');
     const timestamp = assertNonEmptyString(input.wechatpayTimestamp, 'Wechatpay-Timestamp header');
     const nonce = assertNonEmptyString(input.wechatpayNonce, 'Wechatpay-Nonce header');
     const serial = assertNonEmptyString(input.wechatpaySerial, 'Wechatpay-Serial header');
     const signature = assertNonEmptyString(input.wechatpaySignature, 'Wechatpay-Signature header');
 
-    if (serial !== configuredPlatformSerial) {
-      throw new UnauthorizedException('Wechat callback platform serial mismatch');
-    }
-
-    let platformPublicKey;
-
-    try {
-      platformPublicKey = createPublicKey(platformPublicKeyPem);
-    } catch {
-      throw new InternalServerErrorException('WECHAT_PAY_PLATFORM_PUBLIC_KEY_PEM is invalid');
-    }
-
-    const message = `${timestamp}\n${nonce}\n${rawBody}\n`;
-    const verifier = createVerify('RSA-SHA256');
-    verifier.update(message);
-    verifier.end();
-
-    if (!verifier.verify(platformPublicKey, signature, 'base64')) {
-      throw new UnauthorizedException('Wechat callback signature verification failed');
-    }
+    verifyWechatPaySignature(
+      {
+        body: rawBody,
+        timestamp,
+        nonce,
+        serial,
+        signature
+      },
+      {
+        context: 'callback',
+        maxAgeSeconds: 300
+      }
+    );
 
     return {
       provider: 'wechat',

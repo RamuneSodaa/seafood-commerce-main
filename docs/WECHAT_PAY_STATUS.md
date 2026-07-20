@@ -1,51 +1,53 @@
 # 微信支付当前状态
 
-更新时间：20260714_120713
+更新时间：20260720_213734
 
-## 当前状态
+## 已确认
 
-微信支付产品权限仍在审批中，暂不进行真实付款联调。
+- 商户收款/付款限制已经解除
+- 当前商户使用微信支付公钥模式
+- 微信支付公钥已下载并移出公开 Git 仓库目录
+- 微信支付公钥 ID 已确认并保存在本机安全目录
+- 商户 API 证书与商户 RSA 私钥已准备且匹配
+- APIv3 密钥已配置
+- Git 历史中未出现支付私钥或 P12 文件
+- GitHub CI 已覆盖 npm ci、Prisma、API tests、Admin、Storefront、Miniapp build
 
-## 已完成
+## P0.4-P0.7 安全改造
 
-- 微信小程序 AppID 已配置
-- 微信小程序 AppSecret 已配置
-- 商户号已配置
-- 商户 API 证书已准备
-- 商户 RSA 私钥已准备
-- 商户证书与私钥已经验证匹配
-- 商户证书有效期正常
-- APIv3 密钥已配置且长度检查通过
-- 小程序真实支付相关代码已经存在
+- 后端支持 `WECHAT_PAY_PUBLIC_KEY_PEM` 或 `WECHAT_PAY_PUBLIC_KEY_PATH`
+- 使用 `WECHAT_PAY_PUBLIC_KEY_ID` 校验 `Wechatpay-Serial`
+- 微信支付 APIv3 应答在生产环境中强制验签
+- 微信支付回调使用原始 body 验签
+- 回调 `Wechatpay-Timestamp` 限制在 5 分钟窗口内，降低重放风险
+- 回调资源继续使用 APIv3 密钥进行 AES-256-GCM 解密
+- 保留旧平台证书环境变量作为迁移期兼容，不作为当前商户正式配置
 
-## 暂未完成
+## 仍未完成
 
-- 微信支付产品权限审批通过
-- 商户号与小程序 AppID 最终支付授权确认
-- 正式微信支付公钥下载
-- 正式微信支付公钥 ID 确认
-- 稳定 HTTPS 支付回调地址
-- 真实下单和支付回调测试
+- 小程序 AppID 与商户号的最终线上授权/绑定实测
+- 稳定公网 HTTPS API 与支付回调地址
+- 真实 JSAPI 下单获取 `prepay_id`
+- 0.01 元级真实支付闭环
+- 真实微信支付异步回调、订单状态、库存、重复通知幂等验证
+- 上线前密钥轮换与最终安全审计
 
-## 当前问题
+## 正式环境变量
 
-项目根目录中的 wechatpay_platform_public_key.pem 无法被 OpenSSL 解析，
-暂不把它接入 WECHAT_PAY_PLATFORM_PUBLIC_KEY_PEM。
+请求签名：
+- `WECHAT_PAY_MERCHANT_ID`
+- `WECHAT_PAY_MERCHANT_SERIAL`
+- `WECHAT_PAY_MERCHANT_PRIVATE_KEY_PEM`
 
-旧的 Cloudflare 临时支付回调地址已经失效，审批通过后重新建立。
+微信支付身份验签：
+- `WECHAT_PAY_PUBLIC_KEY_PEM` 或 `WECHAT_PAY_PUBLIC_KEY_PATH`
+- `WECHAT_PAY_PUBLIC_KEY_ID`
 
-## 推进原则
+回调解密：
+- `WECHAT_PAY_API_V3_KEY`
 
-审批通过前：
+小程序支付：
+- `WECHAT_MINIAPP_APP_ID`
+- `WECHAT_PAY_NOTIFY_URL`
 
-- 不进行真实付款测试
-- 不把订单手工伪装为微信支付成功
-- 可以继续开发商品、购物车、订单、库存、后台和微信登录
-- 用户支付页面应显示支付功能审批中
-
-审批通过后：
-
-- 从微信支付商户平台下载正式微信支付公钥
-- 确认 PUB_KEY_ID
-- 建立新的 HTTPS 回调地址
-- 完成真实低金额支付闭环
+不得把私钥、APIv3 密钥或 AppSecret 提交到 GitHub。
