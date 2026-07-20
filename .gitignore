@@ -101,3 +101,5 @@ backups/
 # Operating-system files
 .DS_Store
 Thumbs.db
+**/apiclient_key.pem
+**/apiclient_cert.p12
