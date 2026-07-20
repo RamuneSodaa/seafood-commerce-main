@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Install, test and build
+    name: Clean install, test and build
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -34,4 +34,30 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-     
+      - name: Validate Prisma schema
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/seafood_ci?schema=public
+        run: npx prisma validate --schema prisma/schema.prisma
+
+      - name: Generate Prisma Client
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/seafood_ci?schema=public
+        run: npx prisma generate --schema prisma/schema.prisma
+
+      - name: Run API tests
+        run: npm run test -w @seafood/api
+
+      - name: Build admin web
+        run: npm run build -w @seafood/admin-web
+
+      - name: Build storefront web
+        run: npm run build -w @seafood/storefront-web
+
+      - name: Build WeChat miniapp
+        env:
+          TARO_APP_PROFILE: demo
+          TARO_APP_API_BASE_URL: http://127.0.0.1:3000
+          TARO_APP_CUSTOMER_ROLE: CUSTOMER
+          TARO_APP_CUSTOMER_USER_ID: demo-customer
+          TARO_APP_PAYMENT_MODE: mock
+        run: npm run build:weapp -w @seafood/storefront-miniapp
