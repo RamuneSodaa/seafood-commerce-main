@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HealthController } from './health.controller';
 import { AdminAuthModule } from './modules/admin-auth/admin-auth.module';
 import { AuthExchangeModule } from './modules/auth-exchange/auth-exchange.module';
 import { CartModule } from './modules/cart/cart.module';
@@ -12,6 +13,7 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
 import { StoresModule } from './modules/stores/stores.module';
 
 @Module({
+  controllers: [HealthController],
   imports: [
     AdminAuthModule,
     AuthExchangeModule,

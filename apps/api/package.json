@@ -17,7 +17,9 @@
     "seed:prod:marketing:apply": "node -r ts-node/register prisma/seed.production.marketing.ts --apply --confirm-production-seed",
     "seed:prod:admin-bootstrap:dry-run": "node -r ts-node/register prisma/seed.production.admin.bootstrap.ts --dry-run",
     "seed:prod:admin-bootstrap:apply": "node -r ts-node/register prisma/seed.production.admin.bootstrap.ts --apply --confirm-production-admin-bootstrap",
-    "start": "node -r ts-node/register src/main.ts"
+    "start": "node -r ts-node/register src/main.ts",
+    "build": "prisma generate --schema ../../prisma/schema.prisma && tsc -p tsconfig.build.json",
+    "start:prod": "node dist/apps/api/src/main.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.0",
