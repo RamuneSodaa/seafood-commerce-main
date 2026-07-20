@@ -23,6 +23,15 @@
 - 回调资源继续使用 APIv3 密钥进行 AES-256-GCM 解密
 - 保留旧平台证书环境变量作为迁移期兼容，不作为当前商户正式配置
 
+## P0.8B 顾客身份凭证安全
+
+- `CUSTOMER_AUTH_ARTIFACT_SECRET` 已生成并保存在仓库外安全目录
+- 顾客 auth artifact 默认有效期 7 天
+- 可通过 `CUSTOMER_AUTH_ARTIFACT_TTL_SECONDS` 调整有效期
+- 超过有效期的 artifact 拒绝访问
+- 超出 5 分钟时钟偏差的未来 `iat` 拒绝访问
+- 非法 TTL 配置 fail-closed
+
 ## 仍未完成
 
 - 小程序 AppID 与商户号的最终线上授权/绑定实测

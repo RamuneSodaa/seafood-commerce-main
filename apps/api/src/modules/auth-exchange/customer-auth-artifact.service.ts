@@ -23,6 +23,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 @Injectable()
 export class CustomerAuthArtifactService {
   private readonly secretEnvName = 'CUSTOMER_AUTH_ARTIFACT_SECRET';
+  private readonly ttlEnvName = 'CUSTOMER_AUTH_ARTIFACT_TTL_SECONDS';
+  private readonly defaultTtlSeconds = 7 * 24 * 60 * 60;
+  private readonly maxFutureClockSkewMs = 5 * 60 * 1000;
 
   issue(identity: VerifiedCustomerAuthIdentity): string {
     const claims: CustomerAuthArtifactClaims = {
@@ -81,11 +84,57 @@ export class CustomerAuthArtifactService {
       throw new UnauthorizedException('Invalid customer auth artifact userId');
     }
 
+    const issuedAt = parsedPayload.iat;
+
+    if (
+      typeof issuedAt !== 'number' ||
+      !Number.isSafeInteger(issuedAt) ||
+      issuedAt <= 0
+    ) {
+      throw new UnauthorizedException('Invalid customer auth artifact issued-at');
+    }
+
+    const now = Date.now();
+
+    if (issuedAt > now + this.maxFutureClockSkewMs) {
+      throw new UnauthorizedException('Invalid customer auth artifact issued-at');
+    }
+
+    const ttlMs = this.readTtlSeconds() * 1000;
+
+    if (now - issuedAt > ttlMs) {
+      throw new UnauthorizedException('Customer auth artifact expired');
+    }
+
     return {
       provider: 'wechat',
       userId,
       role: UserRole.CUSTOMER
     };
+  }
+
+  private readTtlSeconds(): number {
+    const rawValue = process.env[this.ttlEnvName]?.trim();
+
+    if (!rawValue) {
+      return this.defaultTtlSeconds;
+    }
+
+    if (!/^\d+$/.test(rawValue)) {
+      throw new InternalServerErrorException(
+        `${this.ttlEnvName} must be a positive integer`
+      );
+    }
+
+    const ttlSeconds = Number(rawValue);
+
+    if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds <= 0) {
+      throw new InternalServerErrorException(
+        `${this.ttlEnvName} must be a positive integer`
+      );
+    }
+
+    return ttlSeconds;
   }
 
   private sign(encodedPayload: string): string {
