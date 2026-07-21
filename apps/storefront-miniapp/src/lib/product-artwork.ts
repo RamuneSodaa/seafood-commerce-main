@@ -178,6 +178,16 @@ export function getProductArtwork(productName: string): ProductArtwork {
   return { title: '海味干货', subtitle: '绿膳荟精选', coverSrc: productSoupCoverImage };
 }
 
-export function getProductCover(productName: string): string {
+// 干货封面统一解析：
+// 1) DB 有合法 http(s) coverImageUrl → 优先使用正式远程图片；
+// 2) 否则保持历史兼容：按商品名映射 bundled local artwork。
+// 不解析 legacy assets/products/... 为运行时 URL，避免 Web/Miniapp 合同混淆。
+export function getProductCover(productName: string, coverImageUrl?: string | null): string {
+  const url = (coverImageUrl ?? '').trim();
+
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+
   return getProductArtwork(productName).coverSrc;
 }

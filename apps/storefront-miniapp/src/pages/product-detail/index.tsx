@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro';
 import { Button, Image, Text, View } from '@tarojs/components';
 
-import { getFreshProductCover, getProductArtwork } from '../../lib/product-artwork';
+import { getFreshProductCover, getProductArtwork, getProductCover } from '../../lib/product-artwork';
 import { sanitizeProductDisplayName } from '../../lib/product-display-name';
 import { addCartItem, getMyInvite, getProduct, type ProductDetail } from '../../lib/api';
 import { redirectToCustomerLogin } from '../../lib/customer-login-redirect';
@@ -132,7 +132,9 @@ export default function ProductDetailPage() {
   const productArtwork = product ? getProductArtwork(product.name) : getProductArtwork('');
   // Phase 2.49L-a：fresh 商品封面优先 coverImageUrl、缺失用 fresh 占位图；绝不走 getProductArtwork(干货图)。dry 保持原逻辑。
   const isFreshDetail = product?.internalTag === 'fresh_seafood_catalog';
-  const detailCoverSrc = isFreshDetail ? getFreshProductCover(product?.coverImageUrl) : productArtwork.coverSrc;
+  const detailCoverSrc = isFreshDetail
+    ? getFreshProductCover(product?.coverImageUrl)
+    : getProductCover(product?.name ?? '', product?.coverImageUrl);
 
   async function handleAddToCart() {
     if (!selectedSku) {

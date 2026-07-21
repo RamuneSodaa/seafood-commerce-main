@@ -28,7 +28,7 @@ const FRESH_CATEGORY_THUMBS: Record<string, string> = {
   石斑贵价鱼: freshCatPremiumFish,
   '杂鱼/其它': freshCatMisc
 };
-import { getFreshProductCover, getProductArtwork } from '../../lib/product-artwork';
+import { getFreshProductCover, getProductArtwork, getProductCover } from '../../lib/product-artwork';
 import { DRY_NAV_CATEGORIES, classifyDryProduct } from '../../lib/product-category-nav';
 import { sanitizeProductDisplayName } from '../../lib/product-display-name';
 import serviceDeliveryImage from '../../assets/brand/service-delivery.jpg';
@@ -783,7 +783,7 @@ export default function ProductsPage() {
                   });
                 }}
               >
-                <Image className='product-cover-image' src={artwork.coverSrc} mode='aspectFill' />
+                <Image className='product-cover-image' src={getProductCover(product.name, product.coverImageUrl)} mode='aspectFill' />
                 <View className='product-cover-badge'>
                   <Text>绿膳荟严选</Text>
                 </View>
@@ -889,7 +889,7 @@ export default function ProductsPage() {
             <View className='sku-sheet-panel' onClick={(event) => event.stopPropagation()} onTouchMove={(event) => event.stopPropagation()}>
               <View className='sku-sheet-handle' />
               <View className='sku-sheet-header'>
-                <Image className='sku-sheet-image' src={getProductArtwork(skuSheetProduct.name).coverSrc} mode='aspectFill' />
+                <Image className='sku-sheet-image' src={getProductCover(skuSheetProduct.name, skuSheetProduct.coverImageUrl)} mode='aspectFill' />
                 <View className='sku-sheet-header-copy'>
                   <Text className='sku-sheet-kicker'>绿膳荟严选</Text>
                   <Text className='sku-sheet-title'>{skuSheetProduct.name}</Text>

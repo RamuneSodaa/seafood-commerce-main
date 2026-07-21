@@ -288,7 +288,7 @@ export default function CartPage() {
             return (
               <View className='cart-item-card ui-card-pressable' hoverClass='ui-card-pressable-hover' key={item.id}>
                 {/* Phase 2.51D：鲜鱼用 fresh 真图(coverImageUrl)，干货保持 getProductCover(按名)，鲜鱼绝不 fallback 干货/汤料图 */}
-                <Image className='cart-item-image' src={item.product.isFreshPreorder ? getFreshProductCover(item.product.coverImageUrl) : getProductCover(item.product.name)} mode='aspectFill' />
+                <Image className='cart-item-image' src={item.product.isFreshPreorder ? getFreshProductCover(item.product.coverImageUrl) : getProductCover(item.product.name, item.product.coverImageUrl)} mode='aspectFill' />
                 <View className='cart-item-main'>
                   <View className='cart-item-header'>
                     <Text className='cart-item-title'>{sanitizeProductDisplayName(item.product.name)}</Text>

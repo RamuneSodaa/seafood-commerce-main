@@ -3,7 +3,7 @@ import Taro, { useRouter } from '@tarojs/taro';
 import { Button, Image, Input, RootPortal, Text, View } from '@tarojs/components';
 
 import homeHeroImage from '../../assets/brand/home-hero.jpg';
-import { getProductArtwork } from '../../lib/product-artwork';
+import { getProductCover } from '../../lib/product-artwork';
 import { sanitizeProductDisplayName } from '../../lib/product-display-name';
 import serviceStoreImage from '../../assets/brand/service-store.jpg';
 import {
@@ -43,6 +43,7 @@ type CheckoutLine = {
   id: string;
   productId: string;
   productName: string;
+  coverSrc: string;
   skuId: string;
   skuName: string;
   quantity: number;
@@ -387,6 +388,7 @@ export default function CheckoutPage() {
         id: item.id,
         productId: item.product.id,
         productName: item.product.name,
+        coverSrc: getProductCover(item.product.name, item.product.coverImageUrl),
         skuId: item.sku.id,
         skuName: item.sku.name,
         quantity: item.quantity,
@@ -398,6 +400,7 @@ export default function CheckoutPage() {
         id: activeSku.id,
         productId: product.id,
         productName: product.name,
+        coverSrc: getProductCover(product.name, product.coverImageUrl),
         skuId: activeSku.id,
         skuName: activeSku.name,
         quantity: qty,
@@ -730,7 +733,7 @@ export default function CheckoutPage() {
             sku,
             unitPriceCents: sku.memberPriceCents || sku.priceCents,
             availableStock,
-            coverSrc: getProductArtwork(nextProduct.name).coverSrc
+            coverSrc: getProductCover(nextProduct.name, nextProduct.coverImageUrl)
           });
         }
       }
@@ -764,6 +767,7 @@ export default function CheckoutPage() {
       id: `addon-${recommendation.sku.id}`,
       productId: recommendation.productId,
       productName: recommendation.productName,
+      coverSrc: recommendation.coverSrc,
       skuId: recommendation.sku.id,
       skuName: recommendation.sku.name,
       quantity: 1,
@@ -1043,7 +1047,7 @@ export default function CheckoutPage() {
                       borderRadius: '20rpx'
                     }}
                   >
-                    <Image className='checkout-product-thumb-image' src={getProductArtwork(item.productName).coverSrc} mode='aspectFill' />
+                    <Image className='checkout-product-thumb-image' src={item.coverSrc} mode='aspectFill' />
                     <View className='brand-art-thumb-badge'>
                       <Text>严选</Text>
                     </View>
