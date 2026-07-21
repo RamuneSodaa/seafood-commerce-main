@@ -72,6 +72,15 @@ export function evaluateProductPublishable(product: PublishGuardProduct): Publis
     blocks.push({ code: 'BLOCKED_PRICE_PLACEHOLDER', message: 'placeholderPhase=phase2_47a22 占位商品，禁止发布。' });
   }
 
+  // 3b) 生产有价 Draft：在运营复核完成前一律禁止普通发布。
+  // 即使后续误启用 SKU / 补图，也必须先由受控流程解除该 productionState。
+  if (note.productionState === 'PRICED_DRAFT_REVIEW_REQUIRED') {
+    blocks.push({
+      code: 'BLOCKED_PRICED_DRAFT_REVIEW_REQUIRED',
+      message: '该商品仍处于生产有价 Draft 运营复核状态，禁止直接发布。'
+    });
+  }
+
   // 4) 无 active SKU
   if (activeSkus.length === 0) {
     blocks.push({ code: 'BLOCKED_NO_ACTIVE_SKU', message: '没有 active SKU，禁止发布。' });
