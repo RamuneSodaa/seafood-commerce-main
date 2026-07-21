@@ -9,6 +9,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { MembersModule } from './modules/members/members.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { ProductsModule } from './modules/products/products.module';
+import { ProductAssetsModule } from './modules/product-assets/product-assets.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { StoresModule } from './modules/stores/stores.module';
 
@@ -19,6 +20,7 @@ import { StoresModule } from './modules/stores/stores.module';
     AuthExchangeModule,
     OrdersModule,
     ProductsModule,
+    ProductAssetsModule,
     StoresModule,
     InventoryModule,
     CustomerAddressesModule,
