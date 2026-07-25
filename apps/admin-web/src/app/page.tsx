@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminAlert, AdminPage, AdminSection } from '../components/admin-ui';
-import { adminApi, storeApi, type InventoryRow, type OrderSummary, type ProductRow } from '../lib/api';
+import { adminApi, storeApi, type InventoryRow, type OrderSummary } from '../lib/api';
 import { getInventorySummary } from '../lib/inventory';
 
 const modules = [
@@ -48,7 +48,7 @@ function isPendingOrder(order: OrderSummary): boolean {
 export default function AdminHome() {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
-  const [products, setProducts] = useState<ProductRow[]>([]);
+  const [publishedProductCount, setPublishedProductCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -57,14 +57,14 @@ export default function AdminHome() {
     setError('');
 
     try {
-      const [orderRows, inventoryRows, productRows] = await Promise.all([
+      const [orderRows, inventoryRows, productPage] = await Promise.all([
         storeApi.orders(),
         adminApi.inventory(),
-        adminApi.products()
+        adminApi.products({ page: 1, pageSize: 1, filter: 'all' })
       ]);
       setOrders(orderRows);
       setInventory(inventoryRows);
-      setProducts(productRows);
+      setPublishedProductCount(productPage.counts.published);
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载控制台数据失败');
     } finally {
@@ -80,7 +80,6 @@ export default function AdminHome() {
   const todayOrderCount = useMemo(() => orders.filter((order) => isToday(order.createdAt)).length, [orders]);
   const pendingOrderCount = useMemo(() => orders.filter(isPendingOrder).length, [orders]);
   const riskInventoryCount = inventorySummary.lowStockCount + inventorySummary.highReservedCount;
-  const publishedProductCount = products.filter((product) => product.isPublished).length;
 
   return (
     <AdminPage

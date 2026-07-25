@@ -25,6 +25,15 @@ type PublishedProductFilters = {
   q?: string;
 };
 
+type AdminProductFilter = 'published' | 'unpublished' | 'price_pending' | 'demo' | 'all';
+
+type AdminProductPageFilters = {
+  page?: string | number;
+  pageSize?: string | number;
+  filter?: string;
+  q?: string;
+};
+
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -145,8 +154,125 @@ export class ProductsService {
     };
   }
 
-  list() {
-    return this.prisma.product.findMany({ include: { skus: true }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }] });
+  private buildAdminDemoWhere(): Prisma.ProductWhereInput {
+    return {
+      OR: [
+        { internalTag: 'historical_demo' },
+        {
+          AND: [
+            { internalTag: null },
+            { OR: [{ name: 'Integration Product' }, { name: { startsWith: '新鲜三文鱼' } }] }
+          ]
+        }
+      ]
+    };
+  }
+
+  private buildAdminFilterWhere(filter: AdminProductFilter): Prisma.ProductWhereInput {
+    if (filter === 'published') return { isPublished: true };
+    if (filter === 'unpublished') return { isPublished: false };
+    if (filter === 'price_pending') return { internalTag: PRICE_PENDING_TAG };
+    if (filter === 'demo') return this.buildAdminDemoWhere();
+    return {};
+  }
+
+  private buildAdminSearchWhere(q?: string): Prisma.ProductWhereInput {
+    const query = q?.trim().slice(0, 80);
+    if (!query) return {};
+
+    return {
+      OR: [
+        { name: { contains: query, mode: 'insensitive' } },
+        { description: { contains: query, mode: 'insensitive' } },
+        { category: { contains: query, mode: 'insensitive' } },
+        { skus: { some: { name: { contains: query, mode: 'insensitive' } } } },
+        { skus: { some: { code: { contains: query, mode: 'insensitive' } } } }
+      ]
+    };
+  }
+
+  private parseAdminPositiveInteger(
+    value: string | number | undefined,
+    fallback: number,
+    max?: number
+  ): number {
+    const numeric = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(numeric) || !Number.isSafeInteger(numeric) || numeric < 1) {
+      return fallback;
+    }
+
+    return max === undefined ? numeric : Math.min(numeric, max);
+  }
+
+  async listAdminPage(filters: AdminProductPageFilters = {}) {
+    const page = this.parseAdminPositiveInteger(filters.page, 1, 100_000);
+    const pageSize = this.parseAdminPositiveInteger(filters.pageSize, 8, 20);
+    const allowedFilters: AdminProductFilter[] = ['published', 'unpublished', 'price_pending', 'demo', 'all'];
+    const filter = allowedFilters.includes(filters.filter as AdminProductFilter)
+      ? filters.filter as AdminProductFilter
+      : 'all';
+
+    const where: Prisma.ProductWhereInput = {
+      AND: [this.buildAdminFilterWhere(filter), this.buildAdminSearchWhere(filters.q)]
+    };
+
+    const demoWhere = this.buildAdminDemoWhere();
+    const [items, total, published, unpublished, pricePending, demo, all, totalSkus] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          coverImageUrl: true,
+          category: true,
+          sortOrder: true,
+          isRecommended: true,
+          isPublished: true,
+          supportsPickup: true,
+          supportsShipping: true,
+          internalTag: true,
+          createdAt: true,
+          updatedAt: true,
+          skus: {
+            select: { id: true, code: true, name: true, priceCents: true, isActive: true },
+            orderBy: [{ createdAt: 'asc' }, { code: 'asc' }]
+          }
+        },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      }),
+      this.prisma.product.count({ where }),
+      this.prisma.product.count({ where: { isPublished: true } }),
+      this.prisma.product.count({ where: { isPublished: false } }),
+      this.prisma.product.count({ where: { internalTag: PRICE_PENDING_TAG } }),
+      this.prisma.product.count({ where: demoWhere }),
+      this.prisma.product.count(),
+      this.prisma.sku.count()
+    ]);
+
+    return {
+      items,
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(Math.ceil(total / pageSize), 1),
+      counts: { published, unpublished, price_pending: pricePending, demo, all, skus: totalSkus }
+    };
+  }
+
+  async getAdminDetail(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: { skus: { orderBy: [{ createdAt: 'asc' }, { code: 'asc' }] } }
+    });
+
+    if (!product) {
+      throw new NotFoundException('商品不存在');
+    }
+
+    return product;
   }
 
   async listPublished(filters: PublishedProductFilters = {}) {

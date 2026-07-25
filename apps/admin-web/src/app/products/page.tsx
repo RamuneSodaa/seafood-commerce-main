@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { AdminAlert, AdminBadge, AdminEmpty, AdminLoadingBlocks, AdminPage, AdminSection } from '../../components/admin-ui';
-import { adminApi, type CreateDraftProductPayload, type CreateProductPayload, type ProductRow, type StoreRow, type UpdateProductPayload } from '../../lib/api';
+import { adminApi, type AdminProductCounts, type CreateDraftProductPayload, type CreateProductPayload, type ProductFilterKey, type ProductListRow, type ProductRow, type StoreRow, type UpdateProductPayload } from '../../lib/api';
 import { formatDateTime, formatMoney } from '../../lib/orders';
 import { getProductMerchandisingHint, getProductPriceSummary, getProductStatusMeta } from '../../lib/products';
 
@@ -29,6 +29,7 @@ const EMPTY_DRAFT_FORM = {
 };
 
 const PRICE_PENDING_TAG = 'price_pending';
+const PRODUCT_PAGE_SIZE = 8;
 
 const EMPTY_EDIT_FORM = {
   name: '',
@@ -84,18 +85,11 @@ function isPricePendingDraft(product: ProductRow): boolean {
   return product.internalTag === PRICE_PENDING_TAG;
 }
 
-type ProductFilterKey = 'published' | 'unpublished' | 'price_pending' | 'demo' | 'all';
-
-function matchesProductFilter(product: ProductRow, filter: ProductFilterKey): boolean {
-  if (filter === 'published') return product.isPublished;
-  if (filter === 'unpublished') return !product.isPublished;
-  if (filter === 'price_pending') return isPricePendingDraft(product);
-  if (filter === 'demo') return isHistoricalDemoProduct(product);
-  return true;
-}
-
 export default function AdminProductsPage() {
-  const [data, setData] = useState<ProductRow[]>([]);
+  const [data, setData] = useState<ProductListRow[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailVersion, setDetailVersion] = useState(0);
   const [stores, setStores] = useState<StoreRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -117,16 +111,45 @@ export default function AdminProductsPage() {
   const [unpublishing, setUnpublishing] = useState(false);
   // Phase 2.39B：商品列表筛选，默认只看已发布（当前运营商品）。
   const [productFilter, setProductFilter] = useState<ProductFilterKey>('published');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [productCounts, setProductCounts] = useState<AdminProductCounts>({
+    published: 0,
+    unpublished: 0,
+    price_pending: 0,
+    demo: 0,
+    all: 0,
+    skus: 0
+  });
 
   async function load() {
     setLoading(true);
     setError('');
 
     try {
-      const [rows, storeRows] = await Promise.all([adminApi.products(), adminApi.stores()]);
-      setData(rows);
+      const [response, storeRows] = await Promise.all([
+        adminApi.products({
+          page,
+          pageSize: PRODUCT_PAGE_SIZE,
+          filter: productFilter,
+          q: searchQuery
+        }),
+        adminApi.stores()
+      ]);
+
+      setData(response.items);
       setStores(storeRows);
-      setSelectedId((current) => current || rows[0]?.id || '');
+      setTotalPages(response.totalPages);
+      setTotalProducts(response.total);
+      setProductCounts(response.counts);
+      setSelectedId((current) =>
+        response.items.some((item) => item.id === current)
+          ? current
+          : response.items[0]?.id || ''
+      );
       setCreateForm((current) => ({
         ...current,
         initialStoreId: current.initialStoreId || storeRows[0]?.id || ''
@@ -138,14 +161,41 @@ export default function AdminProductsPage() {
     }
   }
 
+
   useEffect(() => {
     load();
-  }, []);
+  }, [page, productFilter, searchQuery]);
 
-  const selectedProduct = useMemo(
-    () => data.find((item) => item.id === selectedId) ?? data[0] ?? null,
-    [data, selectedId]
-  );
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!selectedId) {
+      setSelectedProduct(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setDetailLoading(true);
+    adminApi
+      .product(selectedId)
+      .then((product) => {
+        if (!cancelled) setSelectedProduct(product);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setSelectedProduct(null);
+          setError(e instanceof Error ? e.message : '加载商品详情失败');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, detailVersion]);
 
   useEffect(() => {
     if (!selectedProduct) {
@@ -233,22 +283,7 @@ export default function AdminProductsPage() {
 
   const canSaveEdit = Boolean(selectedProduct) && editFormMissingFields.length === 0 && !savingEdit;
   const suspectedTestProducts = useMemo(() => data.filter(isSuspectedTestProduct), [data]);
-
-  // Phase 2.39B：分类计数 + 当前筛选下可见商品。
-  const productCounts = useMemo(
-    () => ({
-      published: data.filter((item) => item.isPublished).length,
-      unpublished: data.filter((item) => !item.isPublished).length,
-      price_pending: data.filter(isPricePendingDraft).length,
-      demo: data.filter(isHistoricalDemoProduct).length,
-      all: data.length
-    }),
-    [data]
-  );
-  const visibleProducts = useMemo(
-    () => data.filter((item) => matchesProductFilter(item, productFilter)),
-    [data, productFilter]
-  );
+  const visibleProducts = data;
 
   async function createProduct() {
     if (!canCreate) {
@@ -280,6 +315,7 @@ export default function AdminProductsPage() {
         initialStoreId: trimmedCreateForm.initialStoreId
       });
       await load();
+      setDetailVersion((current) => current + 1);
       setSelectedId(created.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : '创建商品失败');
@@ -311,6 +347,7 @@ export default function AdminProductsPage() {
       setFeedback('价格未定草稿已创建（未发布、无规格、顾客端不可见）。可在「价格未定草稿」筛选中查看。');
       setDraftForm(EMPTY_DRAFT_FORM);
       await load();
+      setDetailVersion((current) => current + 1);
       setSelectedId(created.id);
       setProductFilter('price_pending');
     } catch (e) {
@@ -355,6 +392,7 @@ export default function AdminProductsPage() {
       await adminApi.updateProduct(selectedProduct.id, payload);
       setFeedback('商品编辑已保存。');
       await load();
+      setDetailVersion((current) => current + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存商品编辑失败');
     } finally {
@@ -378,6 +416,7 @@ export default function AdminProductsPage() {
       await adminApi.publishProduct(selectedProduct.id);
       setFeedback('商品已发布，列表已刷新。');
       await load();
+      setDetailVersion((current) => current + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : '发布商品失败');
     } finally {
@@ -400,6 +439,7 @@ export default function AdminProductsPage() {
       await adminApi.unpublishProduct(selectedProduct.id);
       setFeedback('商品已下架（未发布），列表已刷新。');
       await load();
+      setDetailVersion((current) => current + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : '下架商品失败');
     } finally {
@@ -429,6 +469,7 @@ export default function AdminProductsPage() {
       await adminApi.updateSku(skuId, { name, priceCents });
       setFeedback('规格已保存，列表已刷新。');
       await load();
+      setDetailVersion((current) => current + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存规格失败');
     } finally {
@@ -452,6 +493,7 @@ export default function AdminProductsPage() {
       await adminApi.updateSku(skuId, { isActive: nextActive });
       setFeedback(nextActive ? '规格已启用，列表已刷新。' : '规格已停售，列表已刷新。');
       await load();
+      setDetailVersion((current) => current + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : '更新规格状态失败');
     } finally {
@@ -480,6 +522,7 @@ export default function AdminProductsPage() {
       await adminApi.addSku(selectedProduct.id, { name, priceCents });
       setFeedback('新规格已创建（初始库存 0），列表已刷新。');
       await load();
+      setDetailVersion((current) => current + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : '新增规格失败');
     } finally {
@@ -520,22 +563,22 @@ export default function AdminProductsPage() {
       <div className="admin-metric-grid">
         <section className="admin-metric-card">
           <span className="admin-kpi-label">商品数</span>
-          <strong className="admin-kpi-value">{data.length}</strong>
-          <p className="admin-helper">当前后台商品接口返回的商品记录总数。</p>
+          <strong className="admin-kpi-value">{productCounts.all}</strong>
+          <p className="admin-helper">生产库中的商品总数；列表按页加载，避免大响应。</p>
         </section>
         <section className="admin-metric-card">
           <span className="admin-kpi-label">已发布</span>
-          <strong className="admin-kpi-value">{data.filter((item) => item.isPublished).length}</strong>
+          <strong className="admin-kpi-value">{productCounts.published}</strong>
           <p className="admin-helper">已发布商品在满足前台浏览条件后即可对顾客可见。</p>
         </section>
         <section className="admin-metric-card">
           <span className="admin-kpi-label">未发布</span>
-          <strong className="admin-kpi-value">{data.filter((item) => !item.isPublished).length}</strong>
+          <strong className="admin-kpi-value">{productCounts.unpublished}</strong>
           <p className="admin-helper">未发布商品仍需发布后才能面向顾客展示。</p>
         </section>
         <section className="admin-metric-card">
           <span className="admin-kpi-label">规格数量</span>
-          <strong className="admin-kpi-value">{data.reduce((sum, item) => sum + item.skus.length, 0)}</strong>
+          <strong className="admin-kpi-value">{productCounts.skus}</strong>
           <p className="admin-helper">用于帮助运营快速判断每个商品下有多少价格与履约差异。</p>
         </section>
       </div>
@@ -544,7 +587,8 @@ export default function AdminProductsPage() {
         <div className="admin-main">
           <AdminSection
             title="商品列表"
-            description="默认仅显示已发布（当前运营）商品；可切换查看未发布、历史测试或全部。未发布商品不会出现在顾客端。"
+            description={`服务端分页加载，每页 ${PRODUCT_PAGE_SIZE} 条；筛选、搜索与总数均由生产数据库计算。`}
+
           >
             <div className="admin-badges" style={{ marginBottom: '16px' }}>
               {([
@@ -558,12 +602,77 @@ export default function AdminProductsPage() {
                   key={tab.key}
                   type="button"
                   className={productFilter === tab.key ? 'admin-button' : 'admin-button-secondary'}
-                  onClick={() => setProductFilter(tab.key)}
+                  onClick={() => {
+                    setProductFilter(tab.key);
+                    setPage(1);
+                  }}
                 >
                   {tab.label} {tab.count}
                 </button>
               ))}
             </div>
+
+            <div className="admin-actions-row" style={{ marginBottom: '16px' }}>
+              <input
+                className="admin-input"
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    setSearchQuery(searchInput.trim());
+                    setPage(1);
+                  }
+                }}
+                placeholder="搜索商品名、分类、规格名或 SKU 编码"
+                aria-label="搜索商品"
+              />
+              <button
+                className="admin-button-secondary"
+                type="button"
+                onClick={() => {
+                  setSearchQuery(searchInput.trim());
+                  setPage(1);
+                }}
+              >
+                搜索
+              </button>
+              {searchQuery ? (
+                <button
+                  className="admin-button-ghost"
+                  type="button"
+                  onClick={() => {
+                    setSearchInput('');
+                    setSearchQuery('');
+                    setPage(1);
+                  }}
+                >
+                  清除搜索
+                </button>
+              ) : null}
+            </div>
+
+            <div className="admin-actions-row" style={{ marginBottom: '16px' }}>
+              <button
+                className="admin-button-secondary"
+                type="button"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+              >
+                上一页
+              </button>
+              <span className="admin-helper">
+                第 {page} / {totalPages} 页 · 当前筛选共 {totalProducts} 条
+              </span>
+              <button
+                className="admin-button-secondary"
+                type="button"
+                disabled={page >= totalPages || loading}
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              >
+                下一页
+              </button>
+            </div>
+
             {loading ? (
               <AdminLoadingBlocks count={4} />
             ) : visibleProducts.length === 0 ? (
@@ -582,7 +691,7 @@ export default function AdminProductsPage() {
               <div className="admin-list">
                 {visibleProducts.map((product) => {
                   const statusMeta = getProductStatusMeta(product);
-                  const isSelected = selectedProduct?.id === product.id;
+                  const isSelected = selectedId === product.id;
 
                   return (
                     <article
@@ -857,7 +966,9 @@ export default function AdminProductsPage() {
             title="编辑当前商品"
             description="当前只补商品最小编辑闭环，不扩展到多规格编辑器。"
           >
-            {!selectedProduct ? (
+            {detailLoading ? (
+              <AdminLoadingBlocks count={2} />
+            ) : !selectedProduct ? (
               <AdminEmpty
                 title="请选择商品"
                 message="先从商品列表中选择一个商品，再编辑商品基础信息与默认规格。"

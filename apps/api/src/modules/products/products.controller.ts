@@ -14,8 +14,18 @@ export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
   @Get()
-  list() {
-    return this.products.list();
+  list(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('filter') filter?: string,
+    @Query('q') q?: string
+  ) {
+    return this.products.listAdminPage({ page, pageSize, filter, q });
+  }
+
+  @Get(':id')
+  detail(@Param('id') id: string) {
+    return this.products.getAdminDetail(id);
   }
 
   @Post()

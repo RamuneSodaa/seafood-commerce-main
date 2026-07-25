@@ -115,7 +115,16 @@ export const adminApi = {
   // Phase 2.41B：修改当前管理员自己的密码。不返回 token / passwordHash。
   changePassword: (payload: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
     request<{ ok: boolean }>('/admin/auth/change-password', { method: 'POST', body: JSON.stringify(payload) }),
-  products: () => request<ProductRow[]>('/admin/products'),
+  products: (params: AdminProductPageParams = {}) => {
+    const qs = new URLSearchParams();
+    if (params.page) qs.set('page', String(params.page));
+    if (params.pageSize) qs.set('pageSize', String(params.pageSize));
+    if (params.filter) qs.set('filter', params.filter);
+    if (params.q?.trim()) qs.set('q', params.q.trim());
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request<AdminProductPage>(`/admin/products${suffix}`);
+  },
+  product: (id: string) => request<ProductRow>(`/admin/products/${id}`),
   createProduct: (payload: CreateProductPayload) =>
     request<ProductRow>('/admin/products', {
       method: 'POST',
@@ -197,6 +206,35 @@ export type ProductSkuRow = {
     id: string;
     name: string;
   } | null;
+};
+
+export type ProductFilterKey = 'published' | 'unpublished' | 'price_pending' | 'demo' | 'all';
+
+export type AdminProductPageParams = {
+  page?: number;
+  pageSize?: number;
+  filter?: ProductFilterKey;
+  q?: string;
+};
+
+export type AdminProductCounts = {
+  published: number;
+  unpublished: number;
+  price_pending: number;
+  demo: number;
+  all: number;
+  skus: number;
+};
+
+export type ProductListRow = Omit<ProductRow, 'internalNote'>;
+
+export type AdminProductPage = {
+  items: ProductListRow[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: AdminProductCounts;
 };
 
 export type ProductRow = {
