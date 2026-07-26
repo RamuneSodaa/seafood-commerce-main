@@ -3,6 +3,7 @@ export const DEFAULT_STOREFRONT_PAYMENT_MODE = 'mock' as const;
 export const DEFAULT_STOREFRONT_PROFILE = 'demo' as const;
 export const STOREFRONT_CUSTOMER_IDENTITY_STORAGE_KEY = 'seafood-storefront-customer-identity';
 export const STOREFRONT_REAL_CUSTOMER_IDENTITY_STORAGE_KEY = 'seafood-storefront-real-customer-identity';
+export const STOREFRONT_CUSTOMER_AUTH_ARTIFACT_STORAGE_KEY = 'seafood-storefront-customer-auth-artifact';
 
 export type StorefrontProfileName = 'demo' | 'dev' | 'test';
 export type StorefrontPaymentMode = 'mock' | 'wechat-placeholder';

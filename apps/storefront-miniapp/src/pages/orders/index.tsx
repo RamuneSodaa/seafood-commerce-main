@@ -20,7 +20,6 @@ import {
 } from '../../lib/api';
 import { redirectToCustomerLogin } from '../../lib/customer-login-redirect';
 import { sanitizeProductDisplayName } from '../../lib/product-display-name';
-import { getMiniappIdentitySource } from '../../lib/identity';
 import { getStoredCustomerAuthArtifact } from '../../lib/identity-storage';
 
 function formatPriceCents(amountCents: number): string {
@@ -148,7 +147,7 @@ function getReadableErrorMessage(error: unknown, fallback: string): string {
 }
 
 function shouldUseProtectedOrdersPageRead(): boolean {
-  return getMiniappIdentitySource() === 'real-storage';
+  return true;
 }
 
 export default function OrdersPage() {

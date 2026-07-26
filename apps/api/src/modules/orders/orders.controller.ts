@@ -1,9 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, InternalServerErrorException, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { AdminRole } from '@prisma/client';
 import type { Request } from 'express';
-import { Roles } from '../../common/roles/roles.decorator';
-import { UserRole } from '../../common/roles/role.enum';
-import { RolesGuard } from '../../common/roles/roles.guard';
 import { AdminAuthGuard } from '../admin-auth/admin-auth.guard';
 import type { AdminAuthIdentity, RequestWithAdmin } from '../admin-auth/admin-auth.types';
 import { AdminRoles } from '../admin-auth/admin-role.decorator';
@@ -26,10 +23,12 @@ export class OrdersController {
   }
 
   @Post()
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
-  createOrder(@Headers('x-user-id') userId: string, @Body() dto: CreateOrderDto) {
-    return this.workflow.createOrder(userId || 'anonymous-user', dto);
+  @UseGuards(CustomerAuthArtifactGuard)
+  createOrder(
+    @Req() req: { authenticatedCustomer: VerifiedCustomerAuthIdentity },
+    @Body() dto: CreateOrderDto
+  ) {
+    return this.workflow.createOrder(req.authenticatedCustomer.userId, dto);
   }
 
   @Post('authenticated')
@@ -40,10 +39,15 @@ export class OrdersController {
 
   // Phase 2.48J：鲜鱼「提交预订」（fresh-only，写预订单，不触发支付）。
   @Post('fresh-preorder')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
-  createFreshPreorder(@Headers('x-user-id') userId: string, @Body() dto: { storeId?: string; items: Array<{ skuId: string; quantity: number }> }) {
-    return this.workflow.createFreshPreorder(userId || 'anonymous-user', dto);
+  @UseGuards(CustomerAuthArtifactGuard)
+  createFreshPreorder(
+    @Req() req: { authenticatedCustomer: VerifiedCustomerAuthIdentity },
+    @Body() dto: { storeId?: string; items: Array<{ skuId: string; quantity: number }> }
+  ) {
+    return this.workflow.createFreshPreorder(
+      req.authenticatedCustomer.userId,
+      dto
+    );
   }
 
   @Post('fresh-preorder/authenticated')
@@ -56,10 +60,15 @@ export class OrdersController {
   }
 
   @Post('quote-preview')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
-  previewOrderQuote(@Body() dto: OrderQuotePreviewDto) {
-    return this.workflow.previewOrderQuote(dto);
+  @UseGuards(CustomerAuthArtifactGuard)
+  previewOrderQuote(
+    @Req() req: { authenticatedCustomer: VerifiedCustomerAuthIdentity },
+    @Body() dto: OrderQuotePreviewDto
+  ) {
+    return this.workflow.previewOrderQuote(
+      dto,
+      req.authenticatedCustomer.userId
+    );
   }
 
   @Post('quote-preview/authenticated')

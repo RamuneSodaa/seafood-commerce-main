@@ -1,5 +1,6 @@
 import {
   DEFAULT_STOREFRONT_CUSTOMER_ROLE,
+  STOREFRONT_CUSTOMER_AUTH_ARTIFACT_STORAGE_KEY,
   STOREFRONT_CUSTOMER_IDENTITY_STORAGE_KEY,
   STOREFRONT_REAL_CUSTOMER_IDENTITY_STORAGE_KEY
 } from './config';
@@ -11,6 +12,23 @@ export type StoredCustomerIdentity = {
 
 export type StoredPlaceholderCustomerIdentity = StoredCustomerIdentity;
 export type StoredRealCustomerIdentity = StoredCustomerIdentity;
+
+export type StoredCustomerAuthArtifact = string;
+
+function normalizeStoredCustomerAuthArtifact(value: unknown): StoredCustomerAuthArtifact | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const artifact = value.trim();
+  const parts = artifact.split('.');
+
+  if (!artifact || parts.length !== 2 || !parts[0] || !parts[1]) {
+    return null;
+  }
+
+  return artifact;
+}
 
 function normalizeStoredCustomerIdentity(value: unknown): StoredCustomerIdentity | null {
   if (!value || typeof value !== 'object') {
@@ -95,7 +113,50 @@ export function clearStoredRealCustomerIdentity() {
   clearStoredIdentityByKey(STOREFRONT_REAL_CUSTOMER_IDENTITY_STORAGE_KEY);
 }
 
+export function getStoredCustomerAuthArtifact(): StoredCustomerAuthArtifact | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    return normalizeStoredCustomerAuthArtifact(
+      window.localStorage.getItem(STOREFRONT_CUSTOMER_AUTH_ARTIFACT_STORAGE_KEY)
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredCustomerAuthArtifact(artifact: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const normalizedArtifact = normalizeStoredCustomerAuthArtifact(artifact);
+
+  if (!normalizedArtifact) {
+    clearStoredCustomerAuthArtifact();
+    return;
+  }
+
+  window.localStorage.setItem(
+    STOREFRONT_CUSTOMER_AUTH_ARTIFACT_STORAGE_KEY,
+    normalizedArtifact
+  );
+}
+
+export function clearStoredCustomerAuthArtifact() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.removeItem(
+    STOREFRONT_CUSTOMER_AUTH_ARTIFACT_STORAGE_KEY
+  );
+}
+
 export function clearAllStoredCustomerIdentities() {
+  clearStoredCustomerAuthArtifact();
   clearStoredRealCustomerIdentity();
   clearStoredPlaceholderCustomerIdentity();
 }

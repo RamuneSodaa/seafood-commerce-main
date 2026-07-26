@@ -16,6 +16,12 @@ export type StoredCustomerIdentity = {
 
 export type StoredPlaceholderCustomerIdentity = StoredCustomerIdentity;
 export type StoredRealCustomerIdentity = StoredCustomerIdentity;
+export type StoredCustomerAuthArtifact = string;
+
+export type StoredVerifiedCustomerSession = {
+  identity: StoredRealCustomerIdentity;
+  authArtifact: StoredCustomerAuthArtifact;
+};
 
 function normalizeStoredCustomerIdentity(value: unknown): StoredCustomerIdentity | null {
   if (!value || typeof value !== 'object') {
@@ -38,6 +44,21 @@ function normalizeStoredCustomerIdentity(value: unknown): StoredCustomerIdentity
   };
 }
 
+function normalizeStoredAuthArtifact(value: unknown): StoredCustomerAuthArtifact | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const artifact = value.trim();
+  const parts = artifact.split('.');
+
+  if (!artifact || parts.length !== 2 || !parts[0] || !parts[1]) {
+    return null;
+  }
+
+  return artifact;
+}
+
 function getStoredIdentityByKey(storageKey: string): StoredCustomerIdentity | null {
   try {
     const storedValue = Taro.getStorageSync(storageKey) as unknown;
@@ -49,8 +70,9 @@ function getStoredIdentityByKey(storageKey: string): StoredCustomerIdentity | nu
 
 function setStoredIdentityByKey(storageKey: string, identity: StoredCustomerIdentity) {
   const normalizedIdentity = normalizeStoredCustomerIdentity(identity);
+
   if (!normalizedIdentity) {
-    return;
+    throw new Error('Invalid customer identity');
   }
 
   Taro.setStorageSync(storageKey, normalizedIdentity);
@@ -58,15 +80,6 @@ function setStoredIdentityByKey(storageKey: string, identity: StoredCustomerIden
 
 function clearStoredIdentityByKey(storageKey: string) {
   Taro.removeStorageSync(storageKey);
-}
-
-function normalizeStoredAuthArtifact(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const artifact = value.trim();
-  return artifact || null;
 }
 
 export function getStoredPlaceholderCustomerIdentity(): StoredPlaceholderCustomerIdentity | null {
@@ -85,17 +98,16 @@ export function getStoredRealCustomerIdentity(): StoredRealCustomerIdentity | nu
   return getStoredIdentityByKey(MINIAPP_REAL_CUSTOMER_IDENTITY_STORAGE_KEY);
 }
 
-export function setStoredRealCustomerIdentity(identity: StoredRealCustomerIdentity) {
-  setStoredIdentityByKey(MINIAPP_REAL_CUSTOMER_IDENTITY_STORAGE_KEY, identity);
-}
-
 export function clearStoredRealCustomerIdentity() {
   clearStoredIdentityByKey(MINIAPP_REAL_CUSTOMER_IDENTITY_STORAGE_KEY);
 }
 
-export function getStoredCustomerAuthArtifact(): string | null {
+export function getStoredCustomerAuthArtifact(): StoredCustomerAuthArtifact | null {
   try {
-    const storedValue = Taro.getStorageSync(MINIAPP_CUSTOMER_AUTH_ARTIFACT_STORAGE_KEY) as unknown;
+    const storedValue = Taro.getStorageSync(
+      MINIAPP_CUSTOMER_AUTH_ARTIFACT_STORAGE_KEY
+    ) as unknown;
+
     return normalizeStoredAuthArtifact(storedValue);
   } catch {
     return null;
@@ -104,11 +116,16 @@ export function getStoredCustomerAuthArtifact(): string | null {
 
 export function setStoredCustomerAuthArtifact(authArtifact: string) {
   const normalizedArtifact = normalizeStoredAuthArtifact(authArtifact);
+
   if (!normalizedArtifact) {
-    return;
+    clearStoredCustomerAuthArtifact();
+    throw new Error('Invalid customer auth artifact');
   }
 
-  Taro.setStorageSync(MINIAPP_CUSTOMER_AUTH_ARTIFACT_STORAGE_KEY, normalizedArtifact);
+  Taro.setStorageSync(
+    MINIAPP_CUSTOMER_AUTH_ARTIFACT_STORAGE_KEY,
+    normalizedArtifact
+  );
 }
 
 export function clearStoredCustomerAuthArtifact() {
@@ -116,8 +133,73 @@ export function clearStoredCustomerAuthArtifact() {
 }
 
 export function clearAllStoredCustomerIdentities() {
+  clearStoredCustomerAuthArtifact();
   clearStoredRealCustomerIdentity();
   clearStoredPlaceholderCustomerIdentity();
+}
+
+export function replaceStoredVerifiedCustomerSession(
+  identity: StoredRealCustomerIdentity,
+  authArtifact: string
+): StoredVerifiedCustomerSession {
+  const normalizedIdentity = normalizeStoredCustomerIdentity(identity);
+  const normalizedArtifact = normalizeStoredAuthArtifact(authArtifact);
+
+  if (!normalizedIdentity || !normalizedArtifact) {
+    clearAllStoredCustomerIdentities();
+    throw new Error('Invalid verified customer session');
+  }
+
+  clearAllStoredCustomerIdentities();
+
+  try {
+    Taro.setStorageSync(
+      MINIAPP_REAL_CUSTOMER_IDENTITY_STORAGE_KEY,
+      normalizedIdentity
+    );
+    Taro.setStorageSync(
+      MINIAPP_CUSTOMER_AUTH_ARTIFACT_STORAGE_KEY,
+      normalizedArtifact
+    );
+
+    const storedIdentity = getStoredRealCustomerIdentity();
+    const storedArtifact = getStoredCustomerAuthArtifact();
+
+    if (
+      !storedIdentity ||
+      storedIdentity.userId !== normalizedIdentity.userId ||
+      storedIdentity.role !== normalizedIdentity.role ||
+      storedArtifact !== normalizedArtifact
+    ) {
+      throw new Error('Customer session storage verification failed');
+    }
+
+    return {
+      identity: storedIdentity,
+      authArtifact: storedArtifact
+    };
+  } catch (error) {
+    clearAllStoredCustomerIdentities();
+    throw error;
+  }
+}
+
+export function getStoredVerifiedCustomerSession(): StoredVerifiedCustomerSession | null {
+  const identity = getStoredRealCustomerIdentity();
+  const authArtifact = getStoredCustomerAuthArtifact();
+
+  if (identity && authArtifact) {
+    return {
+      identity,
+      authArtifact
+    };
+  }
+
+  if (identity || authArtifact) {
+    clearAllStoredCustomerIdentities();
+  }
+
+  return null;
 }
 
 export function getStoredCustomerIdentity(): StoredPlaceholderCustomerIdentity | null {

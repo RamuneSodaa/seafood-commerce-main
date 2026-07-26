@@ -40,7 +40,7 @@ describe('OrdersController header forwarding', () => {
     process.env.CUSTOMER_AUTH_ARTIFACT_SECRET = originalSecret;
   });
 
-  test('previewOrderQuote forwards body to workflow service', async () => {
+  test('previewOrderQuote uses backend-verified customer scope', async () => {
     const workflow = {
       previewOrderQuote: jest.fn().mockResolvedValue({})
     } as any;
@@ -52,10 +52,20 @@ describe('OrdersController header forwarding', () => {
       items: [{ skuId: 'sku-1', quantity: 1 }],
       couponCode: 'WELCOME-1000'
     };
+    const request = {
+      authenticatedCustomer: {
+        provider: 'wechat',
+        userId: 'wechat:quote-customer',
+        role: UserRole.CUSTOMER
+      }
+    } as any;
 
-    await controller.previewOrderQuote(payload as any);
+    await controller.previewOrderQuote(request, payload as any);
 
-    expect(workflow.previewOrderQuote).toHaveBeenCalledWith(payload);
+    expect(workflow.previewOrderQuote).toHaveBeenCalledWith(
+      payload,
+      'wechat:quote-customer'
+    );
   });
 
   test('handleMiniappPaymentCallback returns provider-safe acknowledgment for applied verified completion', async () => {
@@ -214,21 +224,38 @@ describe('OrdersController header forwarding', () => {
     ).rejects.toThrow(new BadRequestException('Duplicate paymentRef used for a different order'));
   });
 
-  test('shared createOrder forwards legacy customer scope to workflow service', async () => {
+  test('shared createOrder uses backend-verified customer scope and ignores legacy headers', async () => {
     const workflow = {
       createOrder: jest.fn().mockResolvedValue({
-        id: 'order-legacy-create',
-        orderNo: 'SO-LEGACY-1'
+        id: 'order-secure-create',
+        orderNo: 'SO-SECURE-1'
       })
     } as any;
 
     const controller = new OrdersController(workflow);
-    const result = await controller.createOrder('legacy-customer', SAMPLE_CREATE_ORDER_DTO as any);
+    const request = {
+      headers: {
+        'x-role': 'ADMIN',
+        'x-user-id': 'victim-customer'
+      },
+      authenticatedCustomer: {
+        provider: 'wechat',
+        userId: 'wechat:secure-customer',
+        role: UserRole.CUSTOMER
+      }
+    } as any;
+    const result = await controller.createOrder(
+      request,
+      SAMPLE_CREATE_ORDER_DTO as any
+    );
 
-    expect(workflow.createOrder).toHaveBeenCalledWith('legacy-customer', SAMPLE_CREATE_ORDER_DTO);
+    expect(workflow.createOrder).toHaveBeenCalledWith(
+      'wechat:secure-customer',
+      SAMPLE_CREATE_ORDER_DTO
+    );
     expect(result).toEqual({
-      id: 'order-legacy-create',
-      orderNo: 'SO-LEGACY-1'
+      id: 'order-secure-create',
+      orderNo: 'SO-SECURE-1'
     });
   });
 

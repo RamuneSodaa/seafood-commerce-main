@@ -483,7 +483,9 @@ export function clearCartItems(itemIds: string[]) {
 }
 
 export function getCustomerAddresses() {
-  return request<CustomerAddress[]>('/customer/addresses');
+  return request<CustomerAddress[]>('/customer/addresses', {
+    authArtifact: getStoredCustomerAuthArtifact() || undefined
+  });
 }
 
 export function getAuthenticatedCustomerAddresses() {
@@ -510,7 +512,8 @@ export function setAuthenticatedCustomerAddressDefault(id: string) {
 export function createOrder(payload: CreateOrderPayload) {
   return request<CreateOrderResponse>('/orders', {
     method: 'POST',
-    data: payload
+    data: payload,
+    authArtifact: getStoredCustomerAuthArtifact() || undefined
   });
 }
 
@@ -525,7 +528,8 @@ export function createAuthenticatedOrder(payload: CreateOrderPayload) {
 export function previewOrderQuote(payload: OrderQuotePreviewRequest) {
   return request<OrderQuotePreview>('/orders/quote-preview', {
     method: 'POST',
-    data: payload
+    data: payload,
+    authArtifact: getStoredCustomerAuthArtifact() || undefined
   });
 }
 
@@ -590,7 +594,9 @@ export function getReferralSummary() {
 }
 
 export function getOrders() {
-  return request<OrderSummary[]>('/orders');
+  return request<OrderSummary[]>('/orders/authenticated', {
+    authArtifact: getStoredCustomerAuthArtifact() || undefined
+  });
 }
 
 export function getAuthenticatedOrders() {
@@ -600,7 +606,9 @@ export function getAuthenticatedOrders() {
 }
 
 export function getOrder(id: string) {
-  return request<OrderDetail>(`/orders/${id}`);
+  return request<OrderDetail>(`/orders/${id}/authenticated`, {
+    authArtifact: getStoredCustomerAuthArtifact() || undefined
+  });
 }
 
 export function getAuthenticatedOrder(id: string) {
@@ -620,13 +628,6 @@ export function previewAuthenticatedReorder(id: string) {
   return request<ReorderPreviewResponse>(`/orders/${id}/reorder-preview/authenticated`, {
     method: 'POST',
     authArtifact: getStoredCustomerAuthArtifact() || undefined
-  });
-}
-
-export function markPaid(id: string, paymentRef: string, paidAmountCents: number) {
-  return request<PaymentTransitionResult>(`/orders/${id}/mark-paid`, {
-    method: 'POST',
-    data: { paymentRef, paidAmountCents }
   });
 }
 

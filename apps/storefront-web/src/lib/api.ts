@@ -1,6 +1,5 @@
 import type { AuthSuccessResult, ApiError, CreateOrderRequest, CreateOrderResponse } from '../../../../packages/shared-types/src';
 import { CURRENT_STOREFRONT_PROFILE } from './config';
-import { getStorefrontIdentity } from './identity';
 
 export type ProductSku = {
   id: string;
@@ -93,6 +92,16 @@ export type AuthExchangePlaceholderResult = AuthSuccessResult & {
   role?: 'CUSTOMER';
 };
 
+export type AuthExchangeRealRequest = {
+  providerCode: string;
+};
+
+export type AuthExchangeRealResult = AuthSuccessResult & {
+  provider: 'wechat';
+  role: 'CUSTOMER';
+  authArtifact: string;
+};
+
 export type CreateCustomerAddressPayload = {
   receiverName: string;
   phone: string;
@@ -157,17 +166,20 @@ export type OrderDetail = OrderSummary & {
   statusLogs: OrderStatusLogEntry[];
 };
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const identity = getStorefrontIdentity();
+export function mergeStorefrontRequestHeaders(headers?: HeadersInit): Headers {
+  const mergedHeaders = new Headers(headers);
 
+  if (!mergedHeaders.has('content-type')) {
+    mergedHeaders.set('content-type', 'application/json');
+  }
+
+  return mergedHeaders;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${CURRENT_STOREFRONT_PROFILE.apiBaseUrl}${path}`, {
     ...init,
-    headers: {
-      'content-type': 'application/json',
-      'x-role': identity.role,
-      'x-user-id': identity.userId,
-      ...(init?.headers || {})
-    },
+    headers: mergeStorefrontRequestHeaders(init?.headers),
     cache: 'no-store'
   });
 
@@ -176,6 +188,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(err.error?.message || 'Request failed');
   }
   return res.json() as Promise<T>;
+}
+
+export const STOREFRONT_CUSTOMER_TRANSACTION_HOLD_MESSAGE =
+  '网页端暂不开放顾客交易，请使用微信小程序完成登录、下单和支付。';
+
+function customerRequest<T>(
+  _path: string,
+  _init: RequestInit = {}
+): Promise<T> {
+  return Promise.reject<T>(
+    new Error(STOREFRONT_CUSTOMER_TRANSACTION_HOLD_MESSAGE)
+  );
 }
 
 export function getProducts() {
@@ -187,18 +211,18 @@ export function getProduct(id: string) {
 }
 
 export function getOrders() {
-  return request<OrderSummary[]>('/orders');
+  return customerRequest<OrderSummary[]>('/orders/authenticated');
 }
 
 export function createOrder(payload: CreateOrderRequest) {
-  return request<CreateOrderResponse>('/orders', {
+  return customerRequest<CreateOrderResponse>('/orders/authenticated', {
     method: 'POST',
     body: JSON.stringify(payload)
   });
 }
 
 export function previewOrderQuote(payload: OrderQuotePreviewRequest) {
-  return request<OrderQuotePreview>('/orders/quote-preview', {
+  return customerRequest<OrderQuotePreview>('/orders/quote-preview/authenticated', {
     method: 'POST',
     body: JSON.stringify(payload)
   });
@@ -209,41 +233,44 @@ export function getStores() {
 }
 
 export function getOrder(id: string) {
-  return request<OrderDetail>(`/orders/${id}`);
-}
-
-export function markPaid(id: string, paymentRef: string, paidAmountCents: number) {
-  return request<{ result: string }>(`/orders/${id}/mark-paid`, {
-    method: 'POST',
-    body: JSON.stringify({ paymentRef, paidAmountCents })
-  });
+  return customerRequest<OrderDetail>(`/orders/${id}/authenticated`);
 }
 
 export function cancelOrder(id: string) {
-  return request<{ result: string }>(`/orders/${id}/cancel`, {
+  return customerRequest<{ result: string }>(`/orders/${id}/cancel/authenticated`, {
     method: 'POST'
   });
 }
 
 export function getCustomerAddresses() {
-  return request<CustomerAddress[]>('/customer/addresses');
+  return customerRequest<CustomerAddress[]>('/customer/addresses/authenticated');
 }
 
 export function createCustomerAddress(payload: CreateCustomerAddressPayload) {
-  return request<CustomerAddress>('/customer/addresses', {
+  return customerRequest<CustomerAddress>('/customer/addresses/authenticated', {
     method: 'POST',
     body: JSON.stringify(payload)
   });
 }
 
 export function setDefaultCustomerAddress(id: string) {
-  return request<CustomerAddress>(`/customer/addresses/${id}/set-default`, {
-    method: 'POST'
-  });
+  return customerRequest<CustomerAddress>(
+    `/customer/addresses/${id}/set-default/authenticated`,
+    {
+      method: 'POST'
+    }
+  );
 }
 
 export function exchangeAuthPlaceholder(payload: AuthExchangePlaceholderRequest) {
   return request<AuthExchangePlaceholderResult>('/auth/exchange-placeholder', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function exchangeAuthReal(payload: AuthExchangeRealRequest) {
+  return request<AuthExchangeRealResult>('/auth/exchange-real', {
     method: 'POST',
     body: JSON.stringify(payload)
   });

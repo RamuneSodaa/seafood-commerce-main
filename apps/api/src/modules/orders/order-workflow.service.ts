@@ -75,13 +75,13 @@ export class OrderWorkflowService {
 
   private getScopedCustomerId(actor: RequestActor): string | undefined {
     if (actor.role !== UserRole.CUSTOMER) return undefined;
-    if (!actor.userId) throw new ForbiddenException('Customer scope requires x-user-id');
+    if (!actor.userId) throw new ForbiddenException('Customer scope requires authenticated customer identity');
     return actor.userId;
   }
 
   private assertOrderAccess(order: { customerId: string; storeId?: string }, actor: RequestActor) {
     if (actor.role === UserRole.CUSTOMER) {
-      if (!actor.userId) throw new ForbiddenException('Customer scope requires x-user-id');
+      if (!actor.userId) throw new ForbiddenException('Customer scope requires authenticated customer identity');
       if (order.customerId !== actor.userId) {
         throw new ForbiddenException('You do not have access to this order');
       }

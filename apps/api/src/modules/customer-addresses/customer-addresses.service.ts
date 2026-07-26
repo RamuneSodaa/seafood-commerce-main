@@ -8,7 +8,7 @@ export class CustomerAddressesService {
 
   private getCustomerId(userId?: string): string {
     if (!userId) {
-      throw new ForbiddenException('Customer address scope requires x-user-id');
+      throw new ForbiddenException('Customer address scope requires authenticated customer identity');
     }
 
     return userId;

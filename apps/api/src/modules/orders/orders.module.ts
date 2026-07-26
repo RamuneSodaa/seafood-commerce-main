@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { RolesGuard } from '../../common/roles/roles.guard';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { CustomerAuthArtifactGuard } from '../auth-exchange/customer-auth-artifact.guard';
 import { CustomerAuthArtifactService } from '../auth-exchange/customer-auth-artifact.service';
@@ -19,7 +18,6 @@ import { WechatMiniappPaymentCreateClient } from './wechat-miniapp-payment-creat
   controllers: [OrdersController],
   providers: [
     PrismaService,
-    RolesGuard,
     CustomerAuthArtifactService,
     CustomerAuthArtifactGuard,
     OrderRepository,

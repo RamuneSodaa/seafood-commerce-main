@@ -1,10 +1,12 @@
 import {
-  clearStoredPlaceholderCustomerIdentity,
   getStoredRealCustomerIdentity,
-  setStoredRealCustomerIdentity,
+  replaceStoredVerifiedCustomerSession,
   type StoredRealCustomerIdentity
 } from './identity-storage';
-import { resolveMiniappIdentity, type ResolvedMiniappIdentity } from './identity';
+import {
+  resolveMiniappIdentity,
+  type ResolvedMiniappIdentity
+} from './identity';
 
 export type MiniappRealIdentityWriteResult = {
   resolvedIdentity: ResolvedMiniappIdentity;
@@ -12,10 +14,13 @@ export type MiniappRealIdentityWriteResult = {
 };
 
 export function writeMiniappRealIdentityAfterLoginSuccess(
-  identity: StoredRealCustomerIdentity
+  identity: StoredRealCustomerIdentity,
+  authArtifact: string
 ): MiniappRealIdentityWriteResult {
-  setStoredRealCustomerIdentity(identity);
-  clearStoredPlaceholderCustomerIdentity();
+  replaceStoredVerifiedCustomerSession(
+    identity,
+    authArtifact
+  );
 
   return {
     resolvedIdentity: resolveMiniappIdentity(),

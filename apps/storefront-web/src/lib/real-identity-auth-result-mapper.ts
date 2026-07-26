@@ -7,11 +7,13 @@ export type StorefrontAuthResultProvider = 'wechat' | 'mock';
 export type StorefrontAuthSuccessResult = AuthSuccessResult & {
   provider: StorefrontAuthResultProvider;
   role?: typeof DEFAULT_STOREFRONT_CUSTOMER_ROLE;
+  authArtifact?: string;
 };
 
 export type StorefrontMappedRealIdentityResult = {
   provider: StorefrontAuthResultProvider;
   realIdentity: StoredRealCustomerIdentity;
+  authArtifact?: string;
 };
 
 export function mapStorefrontAuthSuccessResultToRealIdentity(
@@ -23,11 +25,14 @@ export function mapStorefrontAuthSuccessResultToRealIdentity(
     throw new Error('Missing auth result userId');
   }
 
+  const authArtifact = authResult.authArtifact?.trim();
+
   return {
     provider: authResult.provider,
     realIdentity: {
       role: authResult.role || DEFAULT_STOREFRONT_CUSTOMER_ROLE,
       userId: trimmedUserId
-    }
+    },
+    ...(authArtifact ? { authArtifact } : {})
   };
 }

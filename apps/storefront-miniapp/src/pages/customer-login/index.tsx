@@ -12,7 +12,6 @@ import {
   getMemberMe,
   getMyCoupons,
   getReferralSummary,
-  verifyCustomerAuthArtifact,
   type CustomerCoupon,
   type MemberProfileSummary,
   type ReferralSummary
@@ -22,10 +21,8 @@ import { getMiniappIdentitySource } from '../../lib/identity';
 import {
   clearAllStoredCustomerIdentities,
   clearPendingInviteCode,
-  clearStoredCustomerAuthArtifact,
   getPendingInviteCode,
   getStoredCustomerAuthArtifact,
-  setStoredCustomerAuthArtifact
 } from '../../lib/identity-storage';
 import { handleMiniappLoginSuccess } from '../../lib/login-success-orchestrator';
 
@@ -160,6 +157,7 @@ export default function CustomerLoginPage() {
     setIsSubmitting(true);
     setFeedback('');
     setError('');
+    clearAllStoredCustomerIdentities();
 
     try {
       const loginResult = await Taro.login();
@@ -177,15 +175,15 @@ export default function CustomerLoginPage() {
         }
       });
 
-      setStoredCustomerAuthArtifact(exchangedResult.authArtifact);
-      handleMiniappLoginSuccess(exchangedResult);
+      const loginSession = await handleMiniappLoginSuccess(exchangedResult);
 
-      const storedAuthArtifact = getStoredCustomerAuthArtifact();
-      if (!storedAuthArtifact) {
-        throw new Error('登录状态保存失败，请重新登录。');
+      if (
+        loginSession.backendVerifiedIdentity.userId !==
+        loginSession.storedRealIdentity.userId
+      ) {
+        throw new Error('登录身份校验不一致，请重新登录。');
       }
 
-      await verifyCustomerAuthArtifact(storedAuthArtifact);
       await bindPendingInviteIfNeeded();
 
       setHasCompletedRealLogin(true);
@@ -201,6 +199,8 @@ export default function CustomerLoginPage() {
         navigateAfterLogin(redirectUrl);
       }, 500);
     } catch (nextError) {
+      clearAllStoredCustomerIdentities();
+      setHasCompletedRealLogin(false);
       setError(getReadableLoginErrorMessage(nextError));
     } finally {
       setIsSubmitting(false);
@@ -217,7 +217,6 @@ export default function CustomerLoginPage() {
 
     if (!result.confirm) return;
 
-    clearStoredCustomerAuthArtifact();
     clearAllStoredCustomerIdentities();
     clearPendingCustomerLoginRedirectUrl();
 

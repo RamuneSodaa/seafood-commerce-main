@@ -1,7 +1,7 @@
 import { CURRENT_MINIAPP_PROFILE, DEFAULT_CUSTOMER_ROLE } from './config';
 import {
   getStoredPlaceholderCustomerIdentity,
-  getStoredRealCustomerIdentity
+  getStoredVerifiedCustomerSession
 } from './identity-storage';
 
 export type MiniappIdentity = {
@@ -38,10 +38,10 @@ export function resolveMiniappIdentity(): ResolvedMiniappIdentity {
     };
   }
 
-  const realIdentity = getStoredRealCustomerIdentity();
-  if (realIdentity) {
+  const verifiedSession = getStoredVerifiedCustomerSession();
+  if (verifiedSession) {
     return {
-      identity: realIdentity,
+      identity: verifiedSession.identity,
       source: 'real-storage'
     };
   }

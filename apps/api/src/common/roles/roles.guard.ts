@@ -17,11 +17,8 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const req = context.switchToHttp().getRequest();
-    const role = (req.headers['x-role'] || '').toString().toUpperCase();
-    if (!requiredRoles.includes(role as UserRole)) {
-      throw new ForbiddenException('Forbidden by role guard');
-    }
-    return true;
+    throw new ForbiddenException(
+      'Legacy header-based role authorization is disabled'
+    );
   }
 }

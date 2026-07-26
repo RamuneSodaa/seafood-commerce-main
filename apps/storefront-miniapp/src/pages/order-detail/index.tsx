@@ -22,7 +22,6 @@ import {
 } from '../../lib/api';
 import { redirectToCustomerLogin } from '../../lib/customer-login-redirect';
 import { sanitizeProductDisplayName } from '../../lib/product-display-name';
-import { getMiniappIdentitySource } from '../../lib/identity';
 import { getStoredCustomerAuthArtifact } from '../../lib/identity-storage';
 import { runCustomerPaymentTransition } from '../../lib/payment-transition';
 
@@ -110,7 +109,7 @@ function getReadableErrorMessage(error: unknown, fallback: string): string {
 }
 
 function shouldUseProtectedOrderDetailRead(): boolean {
-  return getMiniappIdentitySource() === 'real-storage';
+  return true;
 }
 
 const POST_PAYMENT_STATUS_POLL_ATTEMPTS = 3;

@@ -32,7 +32,6 @@ import {
   type StoreSummary
 } from '../../lib/api';
 import { redirectToCustomerLogin } from '../../lib/customer-login-redirect';
-import { getMiniappIdentitySource } from '../../lib/identity';
 import { getStoredCustomerAuthArtifact } from '../../lib/identity-storage';
 
 type ShippingAddressForm = NonNullable<CreateOrderPayload['shippingAddress']> & {
@@ -113,11 +112,11 @@ function getSkuAvailableStock(sku: ProductSku | null | undefined): number {
 }
 
 function shouldUseProtectedCheckoutOrderCreate(): boolean {
-  return getMiniappIdentitySource() === 'real-storage';
+  return true;
 }
 
 function shouldUseProtectedCheckoutAddressRead(): boolean {
-  return getMiniappIdentitySource() === 'real-storage';
+  return true;
 }
 
 function getCheckoutLoginRedirectTarget(params: { productId?: string; skuId?: string; qty?: string; cartItemIds?: string }): string {
