@@ -23,6 +23,10 @@ import productDriedShrimpCoverImage from '../assets/products/product_dried_shrim
 import productTianqiCoverImage from '../assets/products/product_tianqi_cover.jpg';
 import productBaiheCoverImage from '../assets/products/product_baihe_cover.jpg';
 import productHongzaoCoverImage from '../assets/products/product_hongzao_cover.jpg';
+import launchJiulongDiaoyouCoverImage from '../assets/products/product_jiulong_diaoyou_500g_cover.png';
+import launchShaihaoCoverImage from '../assets/products/product_shaihao_500g_cover.png';
+import launchShihuPianCoverImage from '../assets/products/product_shihu_pian_500g_cover.png';
+import launchHuizaoCoverImage from '../assets/products/product_huizao_500g_cover.png';
 import productHoutouguCoverImage from '../assets/products/product_houtougu_cover.jpg';
 import productChashuguCoverImage from '../assets/products/product_chashugu_cover.jpg';
 import productXiangluopianCoverImage from '../assets/products/product_xiangluopian_cover.jpg';
@@ -127,6 +131,11 @@ export function getFreshProductCover(coverImageUrl?: string | null): string {
 }
 
 export function getProductArtwork(productName: string): ProductArtwork {
+  // P2B1D：首批正式商品专属封面，精确名称优先于历史通用映射。
+  if (productName.includes('九龙吊鱿')) return { title: '九龙吊鱿', subtitle: '海味珍品', coverSrc: launchJiulongDiaoyouCoverImage };
+  if (productName.includes('晒蚝')) return { title: '晒蚝', subtitle: '鲜香浓郁', coverSrc: launchShaihaoCoverImage };
+  if (productName.includes('石斛片')) return { title: '石斛片', subtitle: '清润滋养', coverSrc: launchShihuPianCoverImage };
+  if (productName.includes('灰枣')) return { title: '灰枣', subtitle: '甘润可口', coverSrc: launchHuizaoCoverImage };
   // ── scallop / 大元贝 / 干贝瑶柱 ─────────────────
   if (productName.includes('海味汤料组合')) return { title: '滋补汤料', subtitle: '家庭煲汤', coverSrc: productSoupCoverImage };
   if (productName.includes('干贝瑶柱')) return { title: '鲜香瑶柱', subtitle: '煲粥炖汤', coverSrc: productScallopCoverImage };
