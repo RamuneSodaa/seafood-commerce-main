@@ -7,7 +7,7 @@ export const MINIAPP_REAL_CUSTOMER_IDENTITY_STORAGE_KEY = 'seafood-miniapp-real-
 export const MINIAPP_CUSTOMER_AUTH_ARTIFACT_STORAGE_KEY = 'seafood-miniapp-customer-auth-artifact';
 
 export type MiniappProfileName = 'demo' | 'dev' | 'test';
-export type MiniappPaymentMode = 'mock' | 'wechat-placeholder';
+export type MiniappPaymentMode = 'mock' | 'wechat-placeholder' | 'wechat-live';
 
 type MiniappCustomerIdentity = {
   role: typeof DEFAULT_CUSTOMER_ROLE;
@@ -38,6 +38,10 @@ function readConfiguredProfileName(): MiniappProfileName {
 
 function readConfiguredPaymentMode(): MiniappPaymentMode {
   const configuredPaymentMode = process.env.TARO_APP_PAYMENT_MODE?.trim();
+
+  if (configuredPaymentMode === 'wechat-live') {
+    return 'wechat-live';
+  }
 
   if (configuredPaymentMode === 'wechat-placeholder') {
     return 'wechat-placeholder';

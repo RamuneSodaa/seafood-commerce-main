@@ -9,6 +9,7 @@ import { OrderRepository } from './order.repository';
 import { CreateOrderDto, MiniappPaymentCallbackDto, OrderQuotePreviewDto } from './dto/order-workflow.dto';
 import { MiniappPaymentCallbackVerificationService, WechatCallbackSignatureVerificationInput } from './miniapp-payment-callback-verification.service';
 import { WechatMiniappPaymentCreateClient } from './wechat-miniapp-payment-create.client';
+import { assertWechatLivePaymentEnabled } from './payment-runtime-mode';
 
 type RequestActor = {
   role: UserRole | AdminRole;
@@ -513,6 +514,9 @@ export class OrderWorkflowService {
   }
 
   async createMiniappPayment(orderId: string, actor: RequestActor = ADMIN_ACTOR) {
+    // P2D1A-R1：后端是支付最终安全边界。环境变量缺失、disabled 或非法值均拒绝创建 prepay_id。
+    assertWechatLivePaymentEnabled();
+
     const order = await this.getOrder(orderId, actor);
 
     // Phase 2.48K-fix：鲜鱼预订单支付硬拦截。
@@ -551,6 +555,9 @@ export class OrderWorkflowService {
     const verifiedCallback = this.miniappPaymentCallbackVerification.verifyWechatCallbackSignature(
       attempt.callbackPayload,
       verificationInput
+    );
+    this.miniappPaymentCallbackVerification.assertNativeWechatTransactionCallbackEnvelope(
+      verifiedCallback.callbackPayload
     );
     const extractedCallback = this.miniappPaymentCallbackVerification.extractWechatCallbackPayloadForBusinessMapping(
       verifiedCallback.callbackPayload
@@ -1150,6 +1157,7 @@ export class OrderWorkflowService {
     return this.repo.tx(async (tx) => {
       await this.repo.lockOrder(tx, orderId);
       const { order, detail } = await this.loadFreshPreorderContext(tx, orderId);
+      this.assertOrderAccess(order, actor);
       if (detail.stage !== 'PENDING_STORE_CONFIRMATION') {
         throw new BadRequestException(`仅 PENDING_STORE_CONFIRMATION 可确认，当前=${detail.stage}`);
       }
@@ -1191,6 +1199,7 @@ export class OrderWorkflowService {
     return this.repo.tx(async (tx) => {
       await this.repo.lockOrder(tx, orderId);
       const { order, detail } = await this.loadFreshPreorderContext(tx, orderId);
+      this.assertOrderAccess(order, actor);
       if (detail.stage !== 'CONFIRMED_WAITING_PICKUP') {
         throw new BadRequestException(`仅 CONFIRMED_WAITING_PICKUP 可完成，当前=${detail.stage}`);
       }
@@ -1214,6 +1223,7 @@ export class OrderWorkflowService {
     return this.repo.tx(async (tx) => {
       await this.repo.lockOrder(tx, orderId);
       const { order, detail } = await this.loadFreshPreorderContext(tx, orderId);
+      this.assertOrderAccess(order, actor);
       const cancellable = ['PENDING_STORE_CONFIRMATION', 'CONFIRMED_WAITING_PICKUP'];
       if (!cancellable.includes(detail.stage)) {
         throw new BadRequestException(`仅 ${cancellable.join('/')} 可取消，当前=${detail.stage}`);
@@ -1239,23 +1249,41 @@ export class OrderWorkflowService {
     return this.repo.getStatusLogs(orderId);
   }
 
-  // Phase 2.40B：订单内部备注（仅后台）。
-  async listOrderNotes(orderId: string) {
+  // Phase 2.40B / P2D1A-R1：订单内部备注必须继承订单的顾客/门店访问边界。
+  async listOrderNotes(orderId: string, actor: RequestActor = ADMIN_ACTOR) {
     const order = await this.repo.findOrderById(orderId);
     if (!order) throw new NotFoundException('Order not found');
+    this.assertOrderAccess(order, actor);
     return this.repo.listOrderNotes(orderId);
   }
 
-  async addOrderNote(orderId: string, body: string, type: string, operatorAdminId?: string) {
+  async addOrderNote(
+    orderId: string,
+    body: string,
+    type: string,
+    operatorAdminId?: string,
+    actor: RequestActor = ADMIN_ACTOR
+  ) {
     const trimmed = (body || '').trim();
     if (!trimmed) throw new BadRequestException('备注内容不能为空');
     const order = await this.repo.findOrderById(orderId);
     if (!order) throw new NotFoundException('Order not found');
+    this.assertOrderAccess(order, actor);
     return this.repo.createOrderNote(orderId, trimmed, (type || 'internal').trim() || 'internal', operatorAdminId);
   }
 
-  // Phase 2.40C：软删除/撤回订单备注（不硬删；幂等）。
-  async softDeleteOrderNote(orderId: string, noteId: string, operatorAdminId?: string, deleteReason?: string) {
+  // Phase 2.40C / P2D1A-R1：软删除/撤回订单备注（不硬删；幂等；先校验订单门店边界）。
+  async softDeleteOrderNote(
+    orderId: string,
+    noteId: string,
+    operatorAdminId?: string,
+    deleteReason?: string,
+    actor: RequestActor = ADMIN_ACTOR
+  ) {
+    const order = await this.repo.findOrderById(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+    this.assertOrderAccess(order, actor);
+
     const note = await this.repo.findOrderNoteById(noteId);
     if (!note || note.orderId !== orderId) throw new NotFoundException('Order note not found');
     if (note.deletedAt) {

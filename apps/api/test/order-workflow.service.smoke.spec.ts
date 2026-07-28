@@ -63,6 +63,33 @@ function buildEncryptedWechatResourceCallbackBody(payload: Record<string, unknow
   });
 }
 
+function buildSignedNativeWechatCallbackFixture(input: {
+  orderNo: string;
+  transactionId: string;
+  paidAmountCents: number;
+}) {
+  process.env.WECHAT_PAY_API_V3_KEY = TEST_WECHAT_PAY_API_V3_KEY;
+  process.env.WECHAT_PAY_MODE = 'direct';
+  process.env.WECHAT_MINIAPP_APP_ID = 'wx-test-appid';
+  process.env.WECHAT_PAY_MERCHANT_ID = '1900000109';
+
+  const rawBody = buildEncryptedWechatResourceCallbackBody({
+    appid: 'wx-test-appid',
+    mchid: '1900000109',
+    out_trade_no: input.orderNo,
+    transaction_id: input.transactionId,
+    trade_state: 'SUCCESS',
+    amount: { total: input.paidAmountCents }
+  });
+  const fixture = buildSignedWechatCallbackVerificationFixture(rawBody);
+
+  return {
+    rawBody,
+    callbackPayload: JSON.parse(rawBody),
+    fixture
+  };
+}
+
 describe('OrderWorkflowService persistence smoke', () => {
   const originalWechatPayPlatformPublicKeyPem = process.env.WECHAT_PAY_PLATFORM_PUBLIC_KEY_PEM;
   const originalWechatPayPlatformSerial = process.env.WECHAT_PAY_PLATFORM_SERIAL;
@@ -70,6 +97,11 @@ describe('OrderWorkflowService persistence smoke', () => {
   const originalWechatMiniappAppId = process.env.WECHAT_MINIAPP_APP_ID;
   const originalWechatPayMerchantId = process.env.WECHAT_PAY_MERCHANT_ID;
   const originalWechatPayMode = process.env.WECHAT_PAY_MODE;
+  const originalPaymentRuntimeMode = process.env.PAYMENT_RUNTIME_MODE;
+
+  beforeEach(() => {
+    process.env.PAYMENT_RUNTIME_MODE = 'wechat_live';
+  });
 
   afterEach(() => {
     if (originalWechatPayPlatformPublicKeyPem === undefined) {
@@ -106,6 +138,12 @@ describe('OrderWorkflowService persistence smoke', () => {
       delete process.env.WECHAT_PAY_MODE;
     } else {
       process.env.WECHAT_PAY_MODE = originalWechatPayMode;
+    }
+
+    if (originalPaymentRuntimeMode === undefined) {
+      delete process.env.PAYMENT_RUNTIME_MODE;
+    } else {
+      process.env.PAYMENT_RUNTIME_MODE = originalPaymentRuntimeMode;
     }
   });
 
@@ -537,15 +575,18 @@ describe('OrderWorkflowService persistence smoke', () => {
       insertInventoryLogs: async () => ({})
     };
     const service = new OrderWorkflowService(repo, new OrderPricingService());
-    const rawBody = '{"merchantOrderNo":"SO-20260408-1","transactionId":"wx-tx-1001","paidAmountCents":12800}';
-    const fixture = buildSignedWechatCallbackVerificationFixture(rawBody);
+    const { callbackPayload, fixture } = buildSignedNativeWechatCallbackFixture({
+      orderNo: 'SO-20260408-1',
+      transactionId: 'wx-tx-1001',
+      paidAmountCents: 12800
+    });
     process.env.WECHAT_PAY_PLATFORM_PUBLIC_KEY_PEM = fixture.env.publicKeyPem;
     process.env.WECHAT_PAY_PLATFORM_SERIAL = fixture.env.serial;
 
     const result = await service.handleMiniappPaymentCallback(
       {
         provider: 'wechat',
-        callbackPayload: JSON.parse(rawBody),
+        callbackPayload,
         raw: { source: 'callback-signature-test' }
       } as any,
       fixture.input
@@ -581,15 +622,18 @@ describe('OrderWorkflowService persistence smoke', () => {
       createPaymentRecord: jest.fn()
     };
     const service = new OrderWorkflowService(repo, new OrderPricingService());
-    const rawBody = '{"merchantOrderNo":"SO-20260408-2","transactionId":"wx-tx-1002","paidAmountCents":6400}';
-    const fixture = buildSignedWechatCallbackVerificationFixture(rawBody);
+    const { callbackPayload, fixture } = buildSignedNativeWechatCallbackFixture({
+      orderNo: 'SO-20260408-2',
+      transactionId: 'wx-tx-1002',
+      paidAmountCents: 6400
+    });
     process.env.WECHAT_PAY_PLATFORM_PUBLIC_KEY_PEM = fixture.env.publicKeyPem;
     process.env.WECHAT_PAY_PLATFORM_SERIAL = fixture.env.serial;
 
     const result = await service.handleMiniappPaymentCallback(
       {
         provider: 'wechat',
-        callbackPayload: JSON.parse(rawBody)
+        callbackPayload
       } as any,
       fixture.input
     );
@@ -612,8 +656,11 @@ describe('OrderWorkflowService persistence smoke', () => {
       findOrderByOrderNo: async () => null
     };
     const service = new OrderWorkflowService(repo, new OrderPricingService());
-    const rawBody = '{"merchantOrderNo":"SO-MISSING","transactionId":"wx-tx-missing","paidAmountCents":12800}';
-    const fixture = buildSignedWechatCallbackVerificationFixture(rawBody);
+    const { callbackPayload, fixture } = buildSignedNativeWechatCallbackFixture({
+      orderNo: 'SO-MISSING',
+      transactionId: 'wx-tx-missing',
+      paidAmountCents: 12800
+    });
     process.env.WECHAT_PAY_PLATFORM_PUBLIC_KEY_PEM = fixture.env.publicKeyPem;
     process.env.WECHAT_PAY_PLATFORM_SERIAL = fixture.env.serial;
 
@@ -621,7 +668,7 @@ describe('OrderWorkflowService persistence smoke', () => {
       service.handleMiniappPaymentCallback(
         {
           provider: 'wechat',
-          callbackPayload: JSON.parse(rawBody)
+          callbackPayload
         } as any,
         fixture.input
       )
@@ -644,8 +691,11 @@ describe('OrderWorkflowService persistence smoke', () => {
       findPaymentByRef: async () => ({ orderId: 'o-other' })
     };
     const service = new OrderWorkflowService(repo, new OrderPricingService());
-    const rawBody = '{"merchantOrderNo":"SO-20260408-3","transactionId":"wx-tx-1003","paidAmountCents":3200}';
-    const fixture = buildSignedWechatCallbackVerificationFixture(rawBody);
+    const { callbackPayload, fixture } = buildSignedNativeWechatCallbackFixture({
+      orderNo: 'SO-20260408-3',
+      transactionId: 'wx-tx-1003',
+      paidAmountCents: 3200
+    });
     process.env.WECHAT_PAY_PLATFORM_PUBLIC_KEY_PEM = fixture.env.publicKeyPem;
     process.env.WECHAT_PAY_PLATFORM_SERIAL = fixture.env.serial;
 
@@ -653,7 +703,7 @@ describe('OrderWorkflowService persistence smoke', () => {
       service.handleMiniappPaymentCallback(
         {
           provider: 'wechat',
-          callbackPayload: JSON.parse(rawBody)
+          callbackPayload
         } as any,
         fixture.input
       )
@@ -675,8 +725,11 @@ describe('OrderWorkflowService persistence smoke', () => {
       findPaymentByRef: async () => null
     };
     const service = new OrderWorkflowService(repo, new OrderPricingService());
-    const rawBody = '{"merchantOrderNo":"SO-20260408-4","transactionId":"wx-tx-1004","paidAmountCents":1600}';
-    const fixture = buildSignedWechatCallbackVerificationFixture(rawBody);
+    const { callbackPayload, fixture } = buildSignedNativeWechatCallbackFixture({
+      orderNo: 'SO-20260408-4',
+      transactionId: 'wx-tx-1004',
+      paidAmountCents: 1600
+    });
     process.env.WECHAT_PAY_PLATFORM_PUBLIC_KEY_PEM = fixture.env.publicKeyPem;
     process.env.WECHAT_PAY_PLATFORM_SERIAL = fixture.env.serial;
 
@@ -684,7 +737,7 @@ describe('OrderWorkflowService persistence smoke', () => {
       service.handleMiniappPaymentCallback(
         {
           provider: 'wechat',
-          callbackPayload: JSON.parse(rawBody)
+          callbackPayload
         } as any,
         fixture.input
       )
@@ -745,6 +798,33 @@ describe('OrderWorkflowService persistence smoke', () => {
     expect(repo.createPaymentRecord).toHaveBeenCalledWith(expect.any(Object), 'o-callback-v3-1', 'wx-native-transaction-1001', 5900);
   });
 
+  test('handleMiniappPaymentCallback rejects signed structured non-native payload before order lookup', async () => {
+    const repo: any = {
+      findOrderByOrderNo: jest.fn()
+    };
+    const service = new OrderWorkflowService(repo, new OrderPricingService());
+    const rawBody = JSON.stringify({
+      merchantOrderNo: 'SO-STRUCTURED-REPLAY-1',
+      transactionId: 'wx-structured-replay-1',
+      paidAmountCents: 5900
+    });
+    const fixture = buildSignedWechatCallbackVerificationFixture(rawBody);
+    process.env.WECHAT_PAY_PLATFORM_PUBLIC_KEY_PEM = fixture.env.publicKeyPem;
+    process.env.WECHAT_PAY_PLATFORM_SERIAL = fixture.env.serial;
+
+    await expect(
+      service.handleMiniappPaymentCallback(
+        {
+          provider: 'wechat',
+          callbackPayload: JSON.parse(rawBody)
+        } as any,
+        fixture.input
+      )
+    ).rejects.toThrow(new BadRequestException('Wechat callback missing encrypted resource'));
+
+    expect(repo.findOrderByOrderNo).not.toHaveBeenCalled();
+  });
+
   test('handleMiniappPaymentCallback rejects native Wechat v3 non-SUCCESS trade state', async () => {
     process.env.WECHAT_PAY_API_V3_KEY = TEST_WECHAT_PAY_API_V3_KEY;
     const service = new OrderWorkflowService({} as any, new OrderPricingService());
@@ -786,6 +866,9 @@ describe('OrderWorkflowService persistence smoke', () => {
 
   test('handleMiniappPaymentCallback rejects native Wechat v3 amount mismatch before mutation', async () => {
     process.env.WECHAT_PAY_API_V3_KEY = TEST_WECHAT_PAY_API_V3_KEY;
+    process.env.WECHAT_PAY_MODE = 'direct';
+    process.env.WECHAT_MINIAPP_APP_ID = 'wx-test-appid';
+    process.env.WECHAT_PAY_MERCHANT_ID = '1900000109';
     const repo: any = {
       findOrderByOrderNo: async () => ({ id: 'o-callback-v3-mismatch', orderNo: 'SO-V3-MISMATCH' }),
       tx: (fn: any) => fn(buildNonLegacyPaymentTx()),
@@ -806,6 +889,8 @@ describe('OrderWorkflowService persistence smoke', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const service = new OrderWorkflowService(repo, new OrderPricingService());
     const rawBody = buildEncryptedWechatResourceCallbackBody({
+      appid: 'wx-test-appid',
+      mchid: '1900000109',
       out_trade_no: 'SO-V3-MISMATCH',
       transaction_id: 'wx-native-transaction-mismatch',
       trade_state: 'SUCCESS',
@@ -868,7 +953,7 @@ describe('OrderWorkflowService persistence smoke', () => {
     ).toEqual({
       stage: 'CALLBACK_VERIFICATION',
       provider: 'wechat',
-      status: 'NOT_IMPLEMENTED',
+      status: 'READY_FOR_SIGNATURE_VERIFICATION',
       callbackPayload: {
         transactionId: 'tx-structured-1',
         outTradeNo: 'order-ref-1'
@@ -876,7 +961,7 @@ describe('OrderWorkflowService persistence smoke', () => {
       raw: {
         source: 'verification-service-test'
       },
-      message: 'Miniapp payment callback verification is not implemented yet'
+      message: 'Miniapp payment callback payload accepted for signature verification'
     });
   });
 
@@ -989,8 +1074,13 @@ describe('OrderWorkflowService persistence smoke', () => {
 
   test('MiniappPaymentCallbackVerificationService maps native Wechat v3 decrypted fields to business payload', () => {
     process.env.WECHAT_PAY_API_V3_KEY = TEST_WECHAT_PAY_API_V3_KEY;
+    process.env.WECHAT_PAY_MODE = 'direct';
+    process.env.WECHAT_MINIAPP_APP_ID = 'wx-test-appid';
+    process.env.WECHAT_PAY_MERCHANT_ID = '1900000109';
     const verification = new MiniappPaymentCallbackVerificationService();
     const rawBody = buildEncryptedWechatResourceCallbackBody({
+      appid: 'wx-test-appid',
+      mchid: '1900000109',
       out_trade_no: 'SO-V3-2',
       transaction_id: 'wx-native-transaction-1002',
       trade_state: 'SUCCESS',

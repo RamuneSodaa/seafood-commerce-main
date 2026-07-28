@@ -18,6 +18,19 @@ import {
 } from '../src/modules/products/product-publish-guard';
 
 const FRESH_TAG = 'fresh_seafood_catalog';
+const ORIGINAL_PAYMENT_RUNTIME_MODE = process.env.PAYMENT_RUNTIME_MODE;
+
+beforeEach(() => {
+  process.env.PAYMENT_RUNTIME_MODE = 'wechat_live';
+});
+
+afterAll(() => {
+  if (ORIGINAL_PAYMENT_RUNTIME_MODE === undefined) {
+    delete process.env.PAYMENT_RUNTIME_MODE;
+  } else {
+    process.env.PAYMENT_RUNTIME_MODE = ORIGINAL_PAYMENT_RUNTIME_MODE;
+  }
+});
 
 // ---------- 1) publish guard（纯函数） ----------
 describe('product-publish-guard', () => {

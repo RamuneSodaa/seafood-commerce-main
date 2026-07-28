@@ -80,10 +80,29 @@ describe('WechatMiniappPaymentCreateClient', () => {
     jest.restoreAllMocks();
   });
 
+  test('createMiniappPayment fails closed when WECHAT_PAY_MODE is missing', async () => {
+    delete process.env.WECHAT_PAY_MODE;
+    global.fetch = jest.fn();
+
+    await expect(
+      new WechatMiniappPaymentCreateClient().createMiniappPayment({
+        orderNo: 'SO-MODE-MISSING-1',
+        totalAmountCents: 1,
+        openId: 'openid-mode-missing'
+      })
+    ).rejects.toThrow(
+      new InternalServerErrorException(
+        'WECHAT_PAY_MODE must be explicitly configured as "direct" or "partner"'
+      )
+    );
+
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   test('createMiniappPayment calls wechat pay and returns requestPayment-compatible launch params', async () => {
     const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 
-    delete process.env.WECHAT_PAY_MODE;
+    process.env.WECHAT_PAY_MODE = 'direct';
     process.env.WECHAT_MINIAPP_APP_ID = 'wx-miniapp-app-id-1';
     process.env.WECHAT_PAY_MERCHANT_ID = 'merchant-1';
     process.env.WECHAT_PAY_MERCHANT_SERIAL = 'merchant-serial-1';
@@ -205,7 +224,7 @@ describe('WechatMiniappPaymentCreateClient', () => {
   });
 
   test('createMiniappPayment fails honestly when merchant payment config is missing', async () => {
-    delete process.env.WECHAT_PAY_MODE;
+    process.env.WECHAT_PAY_MODE = 'direct';
     process.env.WECHAT_MINIAPP_APP_ID = 'wx-miniapp-app-id-1';
     delete process.env.WECHAT_PAY_MERCHANT_ID;
     process.env.WECHAT_PAY_MERCHANT_SERIAL = 'merchant-serial-1';

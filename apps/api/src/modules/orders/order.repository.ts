@@ -151,7 +151,10 @@ export class OrderRepository {
   }
 
   async findOrderById(orderId: string) {
-    return this.prisma.order.findUnique({ where: { id: orderId }, select: { id: true } });
+    return this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, customerId: true, storeId: true }
+    });
   }
 
   // Phase 2.40C：取单条备注（校验归属用）。

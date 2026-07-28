@@ -31,12 +31,14 @@ function readRequiredWechatPaymentConfig(name: string): string {
 function readWechatPaymentMode(): WechatPaymentMode {
   const rawMode = process.env.WECHAT_PAY_MODE?.trim().toLowerCase();
 
-  if (!rawMode || rawMode === 'direct') {
-    return 'direct';
+  if (rawMode === 'direct' || rawMode === 'partner') {
+    return rawMode;
   }
 
-  if (rawMode === 'partner') {
-    return 'partner';
+  if (!rawMode) {
+    throw new InternalServerErrorException(
+      'WECHAT_PAY_MODE must be explicitly configured as "direct" or "partner"'
+    );
   }
 
   throw new InternalServerErrorException('WECHAT_PAY_MODE must be "direct" or "partner"');

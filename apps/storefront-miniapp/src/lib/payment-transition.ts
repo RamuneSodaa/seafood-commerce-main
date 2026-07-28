@@ -1,4 +1,5 @@
 import { createMiniappPayment } from './api';
+import { CURRENT_MINIAPP_PROFILE } from './config';
 import { getStoredCustomerAuthArtifact } from './identity-storage';
 import { launchWechatMiniappPayment } from './wechat-payment-launch';
 
@@ -9,6 +10,8 @@ type CustomerPaymentTransitionInput = {
 
 const MERCHANT_PAYMENT_REVIEW_MESSAGE =
   '商户支付功能正在审核中，当前暂不可支付，请稍后重试或联系商家。';
+const PAYMENT_RUNTIME_DISABLED_MESSAGE =
+  '微信支付暂未开放，请稍后再试或联系商家。';
 
 export type CustomerPaymentTransitionResult = {
   mode: 'wechat';
@@ -38,6 +41,14 @@ function isMerchantPaymentReviewError(message: string): boolean {
 export async function runCustomerPaymentTransition(
   input: CustomerPaymentTransitionInput
 ): Promise<CustomerPaymentTransitionResult> {
+  if (CURRENT_MINIAPP_PROFILE.paymentMode !== 'wechat-live') {
+    return {
+      mode: 'wechat',
+      success: false,
+      message: PAYMENT_RUNTIME_DISABLED_MESSAGE
+    };
+  }
+
   const storedAuthArtifact = getStoredCustomerAuthArtifact();
 
   if (!storedAuthArtifact) {

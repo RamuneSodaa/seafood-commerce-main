@@ -8,7 +8,7 @@ type SupportedMiniappPaymentCallbackProvider = 'wechat';
 export type MiniappPaymentCallbackVerificationAttempt = {
   stage: 'CALLBACK_VERIFICATION';
   provider: SupportedMiniappPaymentCallbackProvider;
-  status: 'NOT_IMPLEMENTED';
+  status: 'READY_FOR_SIGNATURE_VERIFICATION';
   callbackPayload: Record<string, unknown>;
   raw?: unknown;
   message: string;
@@ -153,22 +153,31 @@ function decryptWechatPayResource(resource: WechatPayEncryptedResource): Record<
 function readWechatPaymentMode(): 'direct' | 'partner' {
   const rawMode = process.env.WECHAT_PAY_MODE?.trim().toLowerCase();
 
-  if (!rawMode || rawMode === 'direct') {
-    return 'direct';
+  if (rawMode === 'direct' || rawMode === 'partner') {
+    return rawMode;
   }
 
-  if (rawMode === 'partner') {
-    return 'partner';
+  if (!rawMode) {
+    throw new InternalServerErrorException('WECHAT_PAY_MODE must be explicitly configured as "direct" or "partner"');
   }
 
-  return 'direct';
+  throw new InternalServerErrorException('WECHAT_PAY_MODE must be "direct" or "partner"');
 }
 
-function assertOptionalConfigMatch(label: string, expected: string | undefined, actual: unknown) {
+function readRequiredWechatVerificationConfig(name: string): string {
+  const value = readOptionalWechatVerificationConfig(name);
+  if (!value) {
+    throw new InternalServerErrorException(`${name} is not configured`);
+  }
+  return value;
+}
+
+function assertRequiredConfigMatch(label: string, envName: string, actual: unknown) {
+  const expected = readRequiredWechatVerificationConfig(envName);
   const actualValue = readOptionalNonEmptyString(actual);
 
-  if (!expected || !actualValue) {
-    return;
+  if (!actualValue) {
+    throw new BadRequestException(`Wechat callback missing ${label}`);
   }
 
   if (expected !== actualValue) {
@@ -180,14 +189,14 @@ function assertWechatCallbackConfigConsistency(payload: Record<string, unknown>)
   const mode = readWechatPaymentMode();
 
   if (mode === 'partner') {
-    assertOptionalConfigMatch('sp_mchid', readOptionalWechatVerificationConfig('WECHAT_PAY_SP_MERCHANT_ID'), payload.sp_mchid);
-    assertOptionalConfigMatch('sub_mchid', readOptionalWechatVerificationConfig('WECHAT_PAY_SUB_MERCHANT_ID'), payload.sub_mchid);
-    assertOptionalConfigMatch('sub_appid', readOptionalWechatVerificationConfig('WECHAT_MINIAPP_APP_ID'), payload.sub_appid);
+    assertRequiredConfigMatch('sp_mchid', 'WECHAT_PAY_SP_MERCHANT_ID', payload.sp_mchid);
+    assertRequiredConfigMatch('sub_mchid', 'WECHAT_PAY_SUB_MERCHANT_ID', payload.sub_mchid);
+    assertRequiredConfigMatch('sub_appid', 'WECHAT_MINIAPP_APP_ID', payload.sub_appid);
     return;
   }
 
-  assertOptionalConfigMatch('mchid', readOptionalWechatVerificationConfig('WECHAT_PAY_MERCHANT_ID'), payload.mchid);
-  assertOptionalConfigMatch('appid', readOptionalWechatVerificationConfig('WECHAT_MINIAPP_APP_ID'), payload.appid);
+  assertRequiredConfigMatch('mchid', 'WECHAT_PAY_MERCHANT_ID', payload.mchid);
+  assertRequiredConfigMatch('appid', 'WECHAT_MINIAPP_APP_ID', payload.appid);
 }
 
 function hasWechatPayResource(callbackPayload: Record<string, unknown>): boolean {
@@ -210,10 +219,10 @@ export class MiniappPaymentCallbackVerificationService {
     return {
       stage: 'CALLBACK_VERIFICATION',
       provider: 'wechat',
-      status: 'NOT_IMPLEMENTED',
+      status: 'READY_FOR_SIGNATURE_VERIFICATION',
       callbackPayload: dto.callbackPayload,
       raw: dto.raw,
-      message: 'Miniapp payment callback verification is not implemented yet'
+      message: 'Miniapp payment callback payload accepted for signature verification'
     };
   }
 
@@ -247,20 +256,37 @@ export class MiniappPaymentCallbackVerificationService {
     };
   }
 
+  assertNativeWechatTransactionCallbackEnvelope(
+    callbackPayload: Record<string, unknown>
+  ): void {
+    if (!hasWechatPayResource(callbackPayload)) {
+      throw new BadRequestException('Wechat callback missing encrypted resource');
+    }
+  }
+
   extractWechatCallbackPayloadForBusinessMapping(
     callbackPayload: Record<string, unknown>
   ): ExtractedWechatMiniappPaymentCallbackPayload {
-    const businessPayload = hasWechatPayResource(callbackPayload)
+    const nativeResource = hasWechatPayResource(callbackPayload);
+    const businessPayload = nativeResource
       ? decryptWechatPayResource(assertWechatPayEncryptedResource(callbackPayload.resource))
       : callbackPayload;
     const tradeState = readOptionalNonEmptyString(businessPayload.trade_state);
 
-    if (tradeState && tradeState !== 'SUCCESS') {
-      throw new BadRequestException(`Wechat payment trade_state is not SUCCESS: ${tradeState}`);
-    }
-
-    if (hasWechatPayResource(callbackPayload)) {
+    if (nativeResource) {
+      const eventType = readOptionalNonEmptyString(callbackPayload.event_type);
+      if (eventType !== 'TRANSACTION.SUCCESS') {
+        throw new BadRequestException('Wechat callback event_type is not TRANSACTION.SUCCESS');
+      }
+      if (!tradeState) {
+        throw new BadRequestException('Wechat callback payload missing trade_state');
+      }
+      if (tradeState !== 'SUCCESS') {
+        throw new BadRequestException(`Wechat payment trade_state is not SUCCESS: ${tradeState}`);
+      }
       assertWechatCallbackConfigConsistency(businessPayload);
+    } else if (tradeState && tradeState !== 'SUCCESS') {
+      throw new BadRequestException(`Wechat payment trade_state is not SUCCESS: ${tradeState}`);
     }
 
     const merchantOrderNo = businessPayload.merchantOrderNo ?? businessPayload.out_trade_no;

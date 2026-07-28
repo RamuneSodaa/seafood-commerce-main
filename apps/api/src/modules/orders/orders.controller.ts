@@ -160,15 +160,21 @@ export class OrdersController {
   @Get(':id/notes')
   @UseGuards(AdminAuthGuard, AdminRoleGuard)
   @AdminRoles(AdminRole.ADMIN, AdminRole.STORE_STAFF)
-  listNotes(@Param('id') id: string) {
-    return this.workflow.listOrderNotes(id);
+  listNotes(@Param('id') id: string, @Req() req: RequestWithAdmin) {
+    return this.workflow.listOrderNotes(id, this.adminActor(req.admin!));
   }
 
   @Post(':id/notes')
   @UseGuards(AdminAuthGuard, AdminRoleGuard)
   @AdminRoles(AdminRole.ADMIN, AdminRole.STORE_STAFF)
   addNote(@Param('id') id: string, @Body() body: CreateOrderNoteDto, @Req() req: RequestWithAdmin) {
-    return this.workflow.addOrderNote(id, body.body, body.type || 'internal', req.admin!.adminId);
+    return this.workflow.addOrderNote(
+      id,
+      body.body,
+      body.type || 'internal',
+      req.admin!.adminId,
+      this.adminActor(req.admin!)
+    );
   }
 
   // Phase 2.40C：软删除/撤回内部备注（不硬删；仅 admin）。
@@ -176,7 +182,13 @@ export class OrdersController {
   @UseGuards(AdminAuthGuard, AdminRoleGuard)
   @AdminRoles(AdminRole.ADMIN, AdminRole.STORE_STAFF)
   softDeleteNote(@Param('orderId') orderId: string, @Param('noteId') noteId: string, @Req() req: RequestWithAdmin) {
-    return this.workflow.softDeleteOrderNote(orderId, noteId, req.admin!.adminId);
+    return this.workflow.softDeleteOrderNote(
+      orderId,
+      noteId,
+      req.admin!.adminId,
+      undefined,
+      this.adminActor(req.admin!)
+    );
   }
 
   @Post(':id/mark-paid')
